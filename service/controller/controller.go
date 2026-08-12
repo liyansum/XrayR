@@ -19,7 +19,6 @@ import (
 	"github.com/wyx2685/XrayR/api/newV2board"
 	"github.com/wyx2685/XrayR/app/mydispatcher"
 	"github.com/wyx2685/XrayR/common/limiter"
-	"github.com/wyx2685/XrayR/common/mylego"
 	"github.com/wyx2685/XrayR/common/serverstatus"
 )
 
@@ -159,16 +158,6 @@ func (c *Controller) Start() error {
 				Execute:  c.userInfoMonitor,
 			}},
 	)
-
-	// Check cert service in need
-	if c.nodeInfo.EnableTLS && !c.config.EnableREALITY {
-		c.tasks = append(c.tasks, periodicTask{
-			tag: "cert monitor",
-			Periodic: &task.Periodic{
-				Interval: time.Duration(c.config.UpdatePeriodic) * time.Second * 60,
-				Execute:  c.certMonitor,
-			}})
-	}
 
 	// Start periodic tasks
 	for i := range c.tasks {
@@ -648,22 +637,3 @@ func (c *Controller) buildNodeTag() string {
 // func (c *Controller) logPrefix() string {
 // 	return fmt.Sprintf("[%s] %s(ID=%d)", c.clientInfo.APIHost, c.nodeInfo.NodeType, c.nodeInfo.NodeID)
 // }
-
-// Check Cert
-func (c *Controller) certMonitor() error {
-	if c.nodeInfo.EnableTLS && !c.config.EnableREALITY {
-		switch c.config.CertConfig.CertMode {
-		case "dns", "http", "tls":
-			lego, err := mylego.New(c.config.CertConfig)
-			if err != nil {
-				c.logger.Print(err)
-			}
-			// Xray-core supports the OcspStapling certification hot renew
-			_, _, _, err = lego.RenewCert()
-			if err != nil {
-				c.logger.Print(err)
-			}
-		}
-	}
-	return nil
-}

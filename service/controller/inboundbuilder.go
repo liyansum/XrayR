@@ -16,7 +16,6 @@ import (
 	"github.com/xtls/xray-core/infra/conf"
 
 	"github.com/wyx2685/XrayR/api"
-	"github.com/wyx2685/XrayR/common/mylego"
 )
 
 // InboundBuilder build Inbound config for different protocol
@@ -41,7 +40,7 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 	// SniffingConfig
 	sniffingConfig := &conf.SniffingConfig{
 		Enabled:      true,
-		DestOverride: &conf.StringList{"http", "tls", "quic", "fakedns"},
+		DestOverride: conf.StringList{"http", "tls", "quic", "fakedns"},
 	}
 	if config.DisableSniffing {
 		sniffingConfig.Enabled = false
@@ -119,10 +118,6 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 		}
 
 		proxySetting.NetworkList = &conf.NetworkList{"tcp", "udp"}
-		proxySetting.IVCheck = true
-		if config.DisableIVCheck {
-			proxySetting.IVCheck = false
-		}
 
 	case "dokodemo-door":
 		protocol = "dokodemo-door"
@@ -238,7 +233,7 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 		}
 	}
 
-	if !isREALITY && nodeInfo.EnableTLS && config.CertConfig.CertMode != "none" {
+	if !isREALITY && nodeInfo.EnableTLS && config.CertConfig != nil && config.CertConfig.CertMode != "none" {
 		streamSetting.Security = "tls"
 		certFile, keyFile, err := getCertFile(config.CertConfig)
 		if err != nil {
@@ -263,36 +258,14 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 	return inboundDetourConfig.Build()
 }
 
-func getCertFile(certConfig *mylego.CertConfig) (certFile string, keyFile string, err error) {
-	switch certConfig.CertMode {
-	case "file":
-		if certConfig.CertFile == "" || certConfig.KeyFile == "" {
-			return "", "", fmt.Errorf("cert file path or key file path not exist")
-		}
-		return certConfig.CertFile, certConfig.KeyFile, nil
-	case "dns":
-		lego, err := mylego.New(certConfig)
-		if err != nil {
-			return "", "", err
-		}
-		certPath, keyPath, err := lego.DNSCert()
-		if err != nil {
-			return "", "", err
-		}
-		return certPath, keyPath, err
-	case "http", "tls":
-		lego, err := mylego.New(certConfig)
-		if err != nil {
-			return "", "", err
-		}
-		certPath, keyPath, err := lego.HTTPCert()
-		if err != nil {
-			return "", "", err
-		}
-		return certPath, keyPath, err
-	default:
-		return "", "", fmt.Errorf("unsupported certmode: %s", certConfig.CertMode)
+func getCertFile(certConfig *CertConfig) (certFile string, keyFile string, err error) {
+	if certConfig.CertMode != "file" {
+		return "", "", fmt.Errorf("unsupported certmode %q: only file is supported", certConfig.CertMode)
 	}
+	if certConfig.CertFile == "" || certConfig.KeyFile == "" {
+		return "", "", fmt.Errorf("cert file path and key file path are required")
+	}
+	return certConfig.CertFile, certConfig.KeyFile, nil
 }
 
 func buildVlessFallbacks(fallbackConfigs []*FallBackConfig) ([]*conf.VLessInboundFallback, error) {

@@ -1,16 +1,13 @@
 package controller
 
-import (
-	"github.com/wyx2685/XrayR/common/limiter"
-	"github.com/wyx2685/XrayR/common/mylego"
-)
+import "github.com/wyx2685/XrayR/common/limiter"
 
 type Config struct {
 	ListenIP                  string                           `mapstructure:"ListenIP"`
 	SendIP                    string                           `mapstructure:"SendIP"`
 	UpdatePeriodic            int                              `mapstructure:"UpdatePeriodic"`
 	DeviceOnlineMinTraffic    int                              `mapstructure:"DeviceOnlineMinTraffic"`
-	CertConfig                *mylego.CertConfig               `mapstructure:"CertConfig"`
+	CertConfig                *CertConfig                      `mapstructure:"CertConfig"`
 	EnableDNS                 bool                             `mapstructure:"EnableDNS"`
 	DNSType                   string                           `mapstructure:"DNSType"`
 	DisableUploadTraffic      bool                             `mapstructure:"DisableUploadTraffic"`
@@ -25,6 +22,15 @@ type Config struct {
 	DisableLocalREALITYConfig bool                             `mapstructure:"DisableLocalREALITYConfig"`
 	EnableREALITY             bool                             `mapstructure:"EnableREALITY"`
 	REALITYConfigs            *REALITYConfig                   `mapstructure:"REALITYConfigs"`
+}
+
+// CertConfig configures a TLS certificate supplied by the operator.
+// Automatic certificate issuance is intentionally not supported.
+type CertConfig struct {
+	CertMode         string `mapstructure:"CertMode"` // none or file
+	CertFile         string `mapstructure:"CertFile"`
+	KeyFile          string `mapstructure:"KeyFile"`
+	RejectUnknownSni bool   `mapstructure:"RejectUnknownSni"`
 }
 
 type AutoSpeedLimitConfig struct {

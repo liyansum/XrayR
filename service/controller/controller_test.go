@@ -14,7 +14,6 @@ import (
 	"github.com/wyx2685/XrayR/api"
 	"github.com/wyx2685/XrayR/api/sspanel"
 	_ "github.com/wyx2685/XrayR/cmd/distro/all"
-	"github.com/wyx2685/XrayR/common/mylego"
 	. "github.com/wyx2685/XrayR/service/controller"
 )
 
@@ -47,15 +46,8 @@ func TestController(t *testing.T) {
 	if err = server.Start(); err != nil {
 		t.Errorf("Failed to start instance: %s", err)
 	}
-	certConfig := &mylego.CertConfig{
-		CertMode:   "http",
-		CertDomain: "test.ss.tk",
-		Provider:   "alidns",
-		Email:      "ss@ss.com",
-	}
 	controlerConfig := &Config{
 		UpdatePeriodic: 5,
-		CertConfig:     certConfig,
 	}
 	apiConfig := &api.Config{
 		APIHost:  "http://127.0.0.1:667",
