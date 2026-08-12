@@ -127,7 +127,8 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 			return nil, err
 		}
 		tlsSettings := &conf.TLSConfig{
-			RejectUnknownSNI: config.CertConfig.RejectUnknownSni,
+			RejectUnknownSNI:         config.CertConfig.RejectUnknownSni,
+			DisableSessionResumption: config.CertConfig.DisableSessionResumption,
 		}
 		tlsSettings.Certs = append(tlsSettings.Certs, &conf.TLSCertConfig{CertFile: certFile, KeyFile: keyFile, OcspStapling: 3600})
 		streamSetting.TLSSettings = tlsSettings

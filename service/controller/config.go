@@ -24,10 +24,11 @@ type Config struct {
 // CertConfig configures a TLS certificate supplied by the operator.
 // Automatic certificate issuance is intentionally not supported.
 type CertConfig struct {
-	CertMode         string `mapstructure:"CertMode"` // none or file
-	CertFile         string `mapstructure:"CertFile"`
-	KeyFile          string `mapstructure:"KeyFile"`
-	RejectUnknownSni bool   `mapstructure:"RejectUnknownSni"`
+	CertMode                 string `mapstructure:"CertMode"` // none or file
+	CertFile                 string `mapstructure:"CertFile"`
+	KeyFile                  string `mapstructure:"KeyFile"`
+	RejectUnknownSni         bool   `mapstructure:"RejectUnknownSni"`
+	DisableSessionResumption bool   `mapstructure:"DisableSessionResumption"`
 }
 
 type AutoSpeedLimitConfig struct {

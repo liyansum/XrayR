@@ -55,6 +55,7 @@ Nodes:
           ProxyProtocolVer: 0 # Send PROXY protocol version, 0 for disable
       CertConfig:
         CertMode: none # none disables TLS; file loads a certificate managed outside XrayR.
+        DisableSessionResumption: false # Session resumption is enabled by default.
         CertFile: /etc/XrayR/cert/node1.test.com.cert
         KeyFile: /etc/XrayR/cert/node1.test.com.key
 
@@ -96,5 +97,6 @@ Nodes:
 #          ProxyProtocolVer: 0 # Send PROXY protocol version, 0 for disable
 #      CertConfig:
 #        CertMode: file # Use a certificate managed outside XrayR.
+#        DisableSessionResumption: false # Session resumption is enabled by default.
 #        CertFile: /etc/XrayR/cert/node1.test.com.cert
 #        KeyFile: /etc/XrayR/cert/node1.test.com.key
