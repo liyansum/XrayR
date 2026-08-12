@@ -39,7 +39,7 @@ type NodeStatus struct {
 type NodeInfo struct {
 	AcceptProxyProtocol bool
 	Authority           string
-	NodeType            string // Must be V2ray, Trojan, and Shadowsocks
+	NodeType            string // Trojan, Shadowsocks, or Shadowsocks-Plugin
 	NodeID              int
 	Port                uint32
 	SpeedLimit          uint64 // Bps

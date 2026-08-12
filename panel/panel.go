@@ -174,6 +174,14 @@ func (p *Panel) Start() {
 
 	// Load Nodes config
 	for _, nodeConfig := range p.panelConfig.NodesConfig {
+		if nodeConfig.ApiConfig == nil {
+			log.Panic("ApiConfig is required")
+		}
+		switch nodeConfig.ApiConfig.NodeType {
+		case "Trojan", "Shadowsocks", "Shadowsocks-Plugin":
+		default:
+			log.Panicf("Unsupported node type %q; this build only supports Trojan, Shadowsocks, and Shadowsocks-Plugin", nodeConfig.ApiConfig.NodeType)
+		}
 		var apiClient api.API
 		switch nodeConfig.PanelType {
 		case "SSpanel":

@@ -56,29 +56,6 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 	var proxySetting any
 	// Build Protocol and Protocol setting
 	switch nodeInfo.NodeType {
-	case "V2ray", "Vmess", "Vless":
-		if (nodeInfo.NodeType == "V2ray" && nodeInfo.EnableVless) || nodeInfo.NodeType == "Vless" {
-			protocol = "vless"
-			// Enable fallback
-			if config.EnableFallback {
-				fallbackConfigs, err := buildVlessFallbacks(config.FallBackConfigs)
-				if err == nil {
-					proxySetting = &conf.VLessInboundConfig{
-						Decryption: "none",
-						Fallbacks:  fallbackConfigs,
-					}
-				} else {
-					return nil, err
-				}
-			} else {
-				proxySetting = &conf.VLessInboundConfig{
-					Decryption: "none",
-				}
-			}
-		} else {
-			protocol = "vmess"
-			proxySetting = &conf.VMessInboundConfig{}
-		}
 	case "Trojan":
 		protocol = "trojan"
 		// Enable fallback
@@ -129,7 +106,7 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 			NetworkList: []string{"tcp", "udp"},
 		}
 	default:
-		return nil, fmt.Errorf("unsupported node type: %s, Only support: V2ray, Trojan, Shadowsocks, and Shadowsocks-Plugin", nodeInfo.NodeType)
+		return nil, fmt.Errorf("unsupported node type: %s; supported types: Trojan, Shadowsocks, and Shadowsocks-Plugin", nodeInfo.NodeType)
 	}
 
 	setting, err := json.Marshal(proxySetting)
@@ -164,76 +141,11 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 			Headers:             headers,
 		}
 		streamSetting.WSSettings = wsSettings
-	case "grpc":
-		grpcSettings := &conf.GRPCConfig{
-			ServiceName: nodeInfo.ServiceName,
-			Authority:   nodeInfo.Authority,
-		}
-		streamSetting.GRPCSettings = grpcSettings
-	case "httpupgrade":
-		httpupgradeSettings := &conf.HttpUpgradeConfig{
-			Headers:             nodeInfo.Headers,
-			Path:                nodeInfo.Path,
-			Host:                nodeInfo.Host,
-			AcceptProxyProtocol: nodeInfo.AcceptProxyProtocol,
-		}
-		streamSetting.HTTPUPGRADESettings = httpupgradeSettings
-	case "splithttp", "xhttp":
-		splithttpSetting := &conf.SplitHTTPConfig{
-			Path: nodeInfo.Path,
-			Host: nodeInfo.Host,
-		}
-		streamSetting.SplitHTTPSettings = splithttpSetting
 	}
 	streamSetting.Network = &transportProtocol
 
-	// Build TLS and REALITY settings
-	var isREALITY bool
-	if config.DisableLocalREALITYConfig {
-		if nodeInfo.REALITYConfig != nil && nodeInfo.EnableREALITY {
-			isREALITY = true
-			streamSetting.Security = "reality"
-
-			r := nodeInfo.REALITYConfig
-			streamSetting.REALITYSettings = &conf.REALITYConfig{
-				Show:         config.REALITYConfigs.Show,
-				Dest:         []byte(`"` + r.Dest + `"`),
-				Xver:         r.ProxyProtocolVer,
-				ServerNames:  r.ServerNames,
-				PrivateKey:   r.PrivateKey,
-				MinClientVer: r.MinClientVer,
-				MaxClientVer: r.MaxClientVer,
-				MaxTimeDiff:  r.MaxTimeDiff,
-				ShortIds:     r.ShortIds,
-			}
-		}
-	} else if config.EnableREALITY && config.REALITYConfigs != nil {
-		isREALITY = true
-		dest, err := json.Marshal(config.REALITYConfigs.Dest)
-		if err != nil {
-			return nil, fmt.Errorf("marshal dest %s config fialed: %s", dest, err)
-		}
-		streamSetting.Security = "reality"
-		var private_key string
-		if nodeInfo.REALITYConfig != nil {
-			private_key = nodeInfo.REALITYConfig.PrivateKey
-		} else {
-			private_key = config.REALITYConfigs.PrivateKey
-		}
-		streamSetting.REALITYSettings = &conf.REALITYConfig{
-			Show:         config.REALITYConfigs.Show,
-			Dest:         dest,
-			Xver:         config.REALITYConfigs.ProxyProtocolVer,
-			ServerNames:  config.REALITYConfigs.ServerNames,
-			PrivateKey:   private_key,
-			MinClientVer: config.REALITYConfigs.MinClientVer,
-			MaxClientVer: config.REALITYConfigs.MaxClientVer,
-			MaxTimeDiff:  config.REALITYConfigs.MaxTimeDiff,
-			ShortIds:     append(config.REALITYConfigs.ShortIds, nodeInfo.REALITYConfig.ShortIds...),
-		}
-	}
-
-	if !isREALITY && nodeInfo.EnableTLS && config.CertConfig != nil && config.CertConfig.CertMode != "none" {
+	// Build TLS settings.
+	if nodeInfo.EnableTLS && config.CertConfig != nil && config.CertConfig.CertMode != "none" {
 		streamSetting.Security = "tls"
 		certFile, keyFile, err := getCertFile(config.CertConfig)
 		if err != nil {
@@ -266,34 +178,6 @@ func getCertFile(certConfig *CertConfig) (certFile string, keyFile string, err e
 		return "", "", fmt.Errorf("cert file path and key file path are required")
 	}
 	return certConfig.CertFile, certConfig.KeyFile, nil
-}
-
-func buildVlessFallbacks(fallbackConfigs []*FallBackConfig) ([]*conf.VLessInboundFallback, error) {
-	if fallbackConfigs == nil {
-		return nil, fmt.Errorf("you must provide FallBackConfigs")
-	}
-
-	vlessFallBacks := make([]*conf.VLessInboundFallback, len(fallbackConfigs))
-	for i, c := range fallbackConfigs {
-
-		if c.Dest == "" {
-			return nil, fmt.Errorf("dest is required for fallback failed")
-		}
-
-		var dest json.RawMessage
-		dest, err := json.Marshal(c.Dest)
-		if err != nil {
-			return nil, fmt.Errorf("marshal dest %s config failed: %s", dest, err)
-		}
-		vlessFallBacks[i] = &conf.VLessInboundFallback{
-			Name: c.SNI,
-			Alpn: c.Alpn,
-			Path: c.Path,
-			Dest: dest,
-			Xver: c.ProxyProtocolVer,
-		}
-	}
-	return vlessFallBacks, nil
 }
 
 func buildTrojanFallbacks(fallbackConfigs []*FallBackConfig) ([]*conf.TrojanInboundFallback, error) {

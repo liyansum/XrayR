@@ -30,8 +30,8 @@ A Xray backend framework that can easily support many panels.
 ## 特点
 
 * 永久开源且免费。
-* 支持V2ray，Trojan， Shadowsocks多种协议。
-* 支持Vless和XTLS等新特性。
+* 精简构建仅支持 Trojan、Shadowsocks 和 Shadowsocks-Plugin。
+* 支持 TCP、WebSocket 与 TLS；不包含 VMess、VLESS、REALITY、gRPC、mKCP/KCP、HTTPUpgrade 和 XHTTP。
 * 支持单实例对接多面板、多节点，无需重复启动。
 * 支持限制在线IP
 * 支持节点端口级别、用户级别限速。
@@ -41,33 +41,18 @@ A Xray backend framework that can easily support many panels.
 
 ## 功能介绍
 
-| 功能        | vmess | vless | trojan | shadowsocks |
-|-----------|-------|-------|--------|-------------|
-| 获取节点信息| √ | √ | √ |√ |
-| 获取用户信息| √ | √ | √ |√ |
-| 用户流量统计| √ | √ | √ |√ |
-| 服务器信息上报| √ | √ | √ |√ |
-| 自动申请tls证书| √ | √ | √ |√ |
-| 自动续签tls证书| √ | √ | √ |√ |
-| 在线人数统计| √ | √ | √ |√ |
-| 在线用户限制| √ | √ | √ |√ |
-| 审计规则| √ | √ | √ |√ |
-| 节点端口限速| √ | √ | √ |√ |
-| 按照用户限速| √ | √ | √ |√ |
-| 自定义DNS| √ | √ | √ |√ |
+| 功能 | trojan | shadowsocks |
+|---|---|---|
+| 获取节点与用户信息 | √ | √ |
+| 用户流量与服务器信息上报 | √ | √ |
+| 在线人数统计与限制 | √ | √ |
+| 审计规则、节点与用户限速 | √ | √ |
+| 自定义 DNS | √ | √ |
 
 ## 支持前端
 
 
-| 前端                                                     | vmess | vless | trojan | shadowsocks |
-|--------------------------------------------------------|-------|-------|--------|-------------------------|
-| sspanel-uim                                            | √     | √     | √      | √ (单端口多用户和V2ray-Plugin) |
-| v2board                                                | √     | √     | √      | √                       |
-| [PMPanel](https://github.com/ByteInternetHK/PMPanel)   | √     | √     | √      | √                       |
-| [ProxyPanel](https://github.com/ProxyPanel/ProxyPanel) | √     | √     | √      | √                       |
-| [WHMCS (V2RaySocks)](https://v2raysocks.doxtex.com/)   | √     | √     | √      | √                       |
-| [GoV2Panel](https://github.com/pingProMax/gov2panel)   | √     | √     | √      | √                       |
-| [BunPanel](https://github.com/pennyMorant/bunpanel-release)   | √     | √     | √      | √                       |
+各面板仅可使用其 Trojan、Shadowsocks 或 Shadowsocks-Plugin 节点类型；已裁剪的协议节点会在启动阶段被明确拒绝。
 
 ## 软件安装
 

@@ -11,11 +11,9 @@ import (
 	"github.com/wyx2685/XrayR/api"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
-	"github.com/xtls/xray-core/infra/conf"
 	"github.com/xtls/xray-core/proxy/shadowsocks"
 	"github.com/xtls/xray-core/proxy/shadowsocks_2022"
 	"github.com/xtls/xray-core/proxy/trojan"
-	"github.com/xtls/xray-core/proxy/vless"
 )
 
 var AEADMethod = map[shadowsocks.CipherType]uint8{
@@ -23,38 +21,6 @@ var AEADMethod = map[shadowsocks.CipherType]uint8{
 	shadowsocks.CipherType_AES_256_GCM:        0,
 	shadowsocks.CipherType_CHACHA20_POLY1305:  0,
 	shadowsocks.CipherType_XCHACHA20_POLY1305: 0,
-}
-
-func (c *Controller) buildVmessUser(userInfo *[]api.UserInfo) (users []*protocol.User) {
-	users = make([]*protocol.User, len(*userInfo))
-	for i, user := range *userInfo {
-		vmessAccount := &conf.VMessAccount{
-			ID:       user.UUID,
-			Security: "auto",
-		}
-		users[i] = &protocol.User{
-			Level:   0,
-			Email:   c.buildUserTag(&user), // Email: InboundTag|email|uid
-			Account: serial.ToTypedMessage(vmessAccount.Build()),
-		}
-	}
-	return users
-}
-
-func (c *Controller) buildVlessUser(userInfo *[]api.UserInfo) (users []*protocol.User) {
-	users = make([]*protocol.User, len(*userInfo))
-	for i, user := range *userInfo {
-		vlessAccount := &vless.Account{
-			Id:   user.UUID,
-			Flow: c.nodeInfo.VlessFlow,
-		}
-		users[i] = &protocol.User{
-			Level:   0,
-			Email:   c.buildUserTag(&user),
-			Account: serial.ToTypedMessage(vlessAccount),
-		}
-	}
-	return users
 }
 
 func (c *Controller) buildTrojanUser(userInfo *[]api.UserInfo) (users []*protocol.User) {
