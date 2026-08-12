@@ -26,8 +26,6 @@ type APIClient struct {
 	NodeID        int
 	Key           string
 	NodeType      string
-	EnableVless   bool
-	VlessFlow     string
 	SpeedLimit    float64
 	DeviceLimit   int
 	LocalRuleList []api.DetectRule
@@ -53,8 +51,6 @@ func New(apiConfig *api.Config) *APIClient {
 		Key:           apiConfig.Key,
 		APIHost:       apiConfig.APIHost,
 		NodeType:      apiConfig.NodeType,
-		EnableVless:   apiConfig.EnableVless,
-		VlessFlow:     apiConfig.VlessFlow,
 		SpeedLimit:    apiConfig.SpeedLimit,
 		DeviceLimit:   apiConfig.DeviceLimit,
 		LocalRuleList: localRuleList,
@@ -114,8 +110,6 @@ func (c *APIClient) GetNodeInfo() (nodeInfo *api.NodeInfo, err error) {
 	c.resp.Store(server)
 
 	switch c.NodeType {
-	case "V2ray", "Vmess", "Vless":
-		nodeInfo, err = c.parseV2rayNodeResponse(server)
 	case "Trojan":
 		nodeInfo, err = c.parseTrojanNodeResponse(server)
 	case "Shadowsocks":
@@ -137,7 +131,7 @@ func (c *APIClient) GetUserList() (UserList *[]api.UserInfo, err error) {
 	path := "/api/server/user"
 
 	switch c.NodeType {
-	case "V2ray", "Trojan", "Shadowsocks", "Vmess", "Vless":
+	case "Trojan", "Shadowsocks":
 		break
 	default:
 		return nil, fmt.Errorf("unsupported node type: %s", c.NodeType)
@@ -283,46 +277,6 @@ func (c *APIClient) parseSSNodeResponse(s *serverConfig) (*api.NodeInfo, error) 
 		ServerKey:         s.ServerKey, // shadowsocks2022 share key
 		NameServerConfig:  s.parseDNSConfig(),
 		Header:            header,
-	}, nil
-}
-
-// parseV2rayNodeResponse parse the response for the given nodeInfo format
-func (c *APIClient) parseV2rayNodeResponse(s *serverConfig) (*api.NodeInfo, error) {
-	var (
-		header    json.RawMessage
-		enableTLS bool
-	)
-
-	switch s.Net {
-	case "tcp":
-		if s.Header != nil {
-			if httpHeader, err := s.Header.MarshalJSON(); err != nil {
-				return nil, err
-			} else {
-				header = httpHeader
-			}
-		}
-	}
-
-	if s.TLS == "tls" {
-		enableTLS = true
-	}
-
-	// Create GeneralNodeInfo
-	return &api.NodeInfo{
-		NodeType:          c.NodeType,
-		NodeID:            c.NodeID,
-		Port:              gconv.Uint32(s.Port),
-		AlterID:           0,
-		TransportProtocol: s.Net,
-		EnableTLS:         enableTLS,
-		Path:              s.Path,
-		Host:              s.Host,
-		EnableVless:       c.EnableVless,
-		VlessFlow:         c.VlessFlow,
-		ServiceName:       s.Sni,
-		Header:            header,
-		NameServerConfig:  s.parseDNSConfig(),
 	}, nil
 }
 

@@ -19,8 +19,6 @@ type Config struct {
 	NodeID              int     `mapstructure:"NodeID"`
 	Key                 string  `mapstructure:"ApiKey"`
 	NodeType            string  `mapstructure:"NodeType"`
-	EnableVless         bool    `mapstructure:"EnableVless"`
-	VlessFlow           string  `mapstructure:"VlessFlow"`
 	Timeout             int     `mapstructure:"Timeout"`
 	SpeedLimit          float64 `mapstructure:"SpeedLimit"`
 	DeviceLimit         int     `mapstructure:"DeviceLimit"`
@@ -39,7 +37,7 @@ type NodeStatus struct {
 type NodeInfo struct {
 	AcceptProxyProtocol bool
 	Authority           string
-	NodeType            string // Trojan, Shadowsocks, or Shadowsocks-Plugin
+	NodeType            string // Trojan or Shadowsocks
 	NodeID              int
 	Port                uint32
 	SpeedLimit          uint64 // Bps
@@ -51,8 +49,6 @@ type NodeInfo struct {
 	EnableTLS           bool
 	EnableSniffing      bool
 	RouteOnly           bool
-	EnableVless         bool
-	VlessFlow           string
 	CypherMethod        string
 	ServerKey           string
 	ServiceName         string
@@ -61,21 +57,8 @@ type NodeInfo struct {
 	HttpHeaders         map[string]*conf.StringList
 	Headers             map[string]string
 	NameServerConfig    []*conf.NameServerConfig
-	EnableREALITY       bool
-	REALITYConfig       *REALITYConfig
 	Show                bool
 	EnableTFO           bool
-	Dest                string
-	ProxyProtocolVer    uint64
-	ServerNames         []string
-	PrivateKey          string
-	MinClientVer        string
-	MaxClientVer        string
-	MaxTimeDiff         uint64
-	ShortIds            []string
-	Xver                uint64
-	Flow                string
-	Security            string
 	Key                 string
 	RejectUnknownSni    bool
 }
@@ -119,15 +102,4 @@ type DetectRule struct {
 type DetectResult struct {
 	UID    int
 	RuleID int
-}
-
-type REALITYConfig struct {
-	Dest             string
-	ProxyProtocolVer uint64
-	ServerNames      []string
-	PrivateKey       string
-	MinClientVer     string
-	MaxClientVer     string
-	MaxTimeDiff      uint64
-	ShortIds         []string
 }

@@ -10,13 +10,7 @@ type NodeInfoResponse struct {
 	TrafficRate     float64 `json:"trafficRate"`
 	RawServerString string  `json:"outServer"`
 	Port            uint32  `json:"outPort"`
-	AlterId         uint16  `json:"alterId"`
-	Network         string  `json:"network"`
-	Security        string  `json:"security"`
 	Host            string  `json:"host"`
-	Path            string  `json:"path"`
-	Grpc            bool    `json:"grpc"`
-	Sni             string  `json:"sni"`
 }
 
 // UserResponse is the response of user

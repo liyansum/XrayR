@@ -23,13 +23,13 @@
       "domain": [
         "geosite:cn"
       ],
-      "outboundTag": "warp"
+      "outboundTag": "IPv4_out"
     },
     {
       "ip": [
         "geoip:cn"
       ],
-      "outboundTag": "warp"
+      "outboundTag": "IPv4_out"
     },
     {
       "outboundTag": "IPv4_out",

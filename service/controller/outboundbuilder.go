@@ -2,7 +2,8 @@ package controller
 
 import (
 	"encoding/json"
-	"fmt"
+
+	"github.com/xtls/xray-core/common/errors"
 
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/infra/conf"
@@ -31,14 +32,10 @@ func OutboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.
 	proxySetting := &conf.FreedomConfig{
 		DomainStrategy: domainStrategy,
 	}
-	// Used for Shadowsocks-Plugin
-	if nodeInfo.NodeType == "dokodemo-door" {
-		proxySetting.Redirect = fmt.Sprintf("127.0.0.1:%d", nodeInfo.Port-1)
-	}
 	var setting json.RawMessage
 	setting, err := json.Marshal(proxySetting)
 	if err != nil {
-		return nil, fmt.Errorf("marshal proxy %s config failed: %s", nodeInfo.NodeType, err)
+		return nil, errors.New("marshal proxy ", nodeInfo.NodeType, " config failed: ").Base(err)
 	}
 	outboundDetourConfig.Settings = &setting
 	return outboundDetourConfig.Build()

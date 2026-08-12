@@ -24,8 +24,6 @@ type APIClient struct {
 	NodeID        int
 	Key           string
 	NodeType      string
-	EnableVless   bool
-	VlessFlow     string
 	SpeedLimit    float64
 	DeviceLimit   int
 	LocalRuleList []api.DetectRule
@@ -40,17 +38,9 @@ func New(apiConfig *api.Config) *APIClient {
 	client.SetBaseURL(apiConfig.APIHost)
 
 	// Create Key for each requests
-	nodeType_for_requests := func() string {
-		if apiConfig.NodeType == "V2ray" && apiConfig.EnableVless {
-			return "vless"
-		} else {
-			return apiConfig.NodeType
-		}
-	}()
-
 	client.SetQueryParams(map[string]string{
 		"node_id":   strconv.Itoa(apiConfig.NodeID),
-		"node_type": strings.ToLower(nodeType_for_requests),
+		"node_type": strings.ToLower(apiConfig.NodeType),
 		"token":     apiConfig.Key,
 	})
 	// Read local rule list
@@ -61,8 +51,6 @@ func New(apiConfig *api.Config) *APIClient {
 		Key:           apiConfig.Key,
 		APIHost:       apiConfig.APIHost,
 		NodeType:      apiConfig.NodeType,
-		EnableVless:   apiConfig.EnableVless,
-		VlessFlow:     apiConfig.VlessFlow,
 		SpeedLimit:    apiConfig.SpeedLimit,
 		DeviceLimit:   apiConfig.DeviceLimit,
 		LocalRuleList: localRuleList,
@@ -123,8 +111,6 @@ func (c *APIClient) GetNodeInfo() (nodeInfo *api.NodeInfo, err error) {
 	c.resp.Store(server)
 
 	switch c.NodeType {
-	case "V2ray", "Vmess", "Vless":
-		nodeInfo, err = c.parseV2rayNodeResponse(server)
 	case "Trojan":
 		nodeInfo, err = c.parseTrojanNodeResponse(server)
 	case "Shadowsocks":
@@ -146,7 +132,7 @@ func (c *APIClient) GetUserList() (UserList *[]api.UserInfo, err error) {
 	path := "/api/v1/server/UniProxy/user"
 
 	switch c.NodeType {
-	case "V2ray", "Trojan", "Shadowsocks", "Vmess", "Vless":
+	case "Trojan", "Shadowsocks":
 		break
 	default:
 		return nil, fmt.Errorf("unsupported node type: %s", c.NodeType)
@@ -302,50 +288,14 @@ func (c *APIClient) ReportIllegal(detectResultList *[]api.DetectResult) error {
 
 // parseTrojanNodeResponse parse the response for the given nodeInfo format
 func (c *APIClient) parseTrojanNodeResponse(s *serverConfig) (*api.NodeInfo, error) {
-	var (
-		host   string
-		header json.RawMessage
-	)
-	transportProtocol := func() string {
-		if s.Network == "" {
-			return "tcp"
-		} else {
-			return s.Network
-		}
-	}()
-	switch transportProtocol {
-	case "ws":
-		if s.NetworkSettings.Headers != nil {
-			if httpHeader, err := s.NetworkSettings.Headers.MarshalJSON(); err != nil {
-				return nil, err
-			} else {
-				b, _ := simplejson.NewJson(httpHeader)
-				host = b.Get("Host").MustString()
-			}
-		}
-	case "tcp":
-		if s.NetworkSettings.Header != nil {
-			if httpHeader, err := s.NetworkSettings.Header.MarshalJSON(); err != nil {
-				return nil, err
-			} else {
-				header = httpHeader
-			}
-		}
-	}
-	// Create GeneralNodeInfo
-	nodeInfo := &api.NodeInfo{
+	return &api.NodeInfo{
 		NodeType:          c.NodeType,
 		NodeID:            c.NodeID,
 		Port:              uint32(s.ServerPort),
-		TransportProtocol: transportProtocol,
-		Path:              s.NetworkSettings.Path,
+		TransportProtocol: "tcp",
 		EnableTLS:         true,
-		Host:              host,
-		Header:            header,
-		ServiceName:       s.NetworkSettings.ServiceName,
 		NameServerConfig:  s.parseDNSConfig(),
-	}
-	return nodeInfo, nil
+	}, nil
 }
 
 // parseSSNodeResponse parse the response for the given nodeInfo format
@@ -376,86 +326,6 @@ func (c *APIClient) parseSSNodeResponse(s *serverConfig) (*api.NodeInfo, error) 
 		ServerKey:         s.ServerKey, // shadowsocks2022 share key
 		NameServerConfig:  s.parseDNSConfig(),
 		Header:            header,
-	}, nil
-}
-
-// parseV2rayNodeResponse parse the response for the given nodeInfo format
-func (c *APIClient) parseV2rayNodeResponse(s *serverConfig) (*api.NodeInfo, error) {
-	var (
-		host          string
-		header        json.RawMessage
-		enableTLS     bool
-		enableREALITY bool
-		dest          string
-	)
-	if s.TlsSettings.Dest != "" {
-		dest = s.TlsSettings.Dest
-	} else {
-		dest = s.TlsSettings.Sni
-	}
-	realityconfig := api.REALITYConfig{
-		Dest:             dest + ":" + s.TlsSettings.ServerPort,
-		ProxyProtocolVer: s.TlsSettings.Xver,
-		ServerNames:      []string{s.TlsSettings.Sni},
-		PrivateKey:       s.TlsSettings.PrivateKey,
-		ShortIds:         []string{s.TlsSettings.ShortId},
-	}
-	switch s.Network {
-	case "ws":
-		if s.NetworkSettings.Headers != nil {
-			if httpHeader, err := s.NetworkSettings.Headers.MarshalJSON(); err != nil {
-				return nil, err
-			} else {
-				b, _ := simplejson.NewJson(httpHeader)
-				host = b.Get("Host").MustString()
-			}
-		}
-	case "tcp":
-		if s.NetworkSettings.Header != nil {
-			if httpHeader, err := s.NetworkSettings.Header.MarshalJSON(); err != nil {
-				return nil, err
-			} else {
-				header = httpHeader
-			}
-		}
-	case "httpupgrade", "xhttp":
-		if s.NetworkSettings.Headers != nil {
-			if httpHeaders, err := s.NetworkSettings.Headers.MarshalJSON(); err != nil {
-				return nil, err
-			} else {
-				b, _ := simplejson.NewJson(httpHeaders)
-				host = b.Get("Host").MustString()
-			}
-		}
-		if s.NetworkSettings.Host != "" {
-			host = s.NetworkSettings.Host
-		}
-	}
-
-	if s.Tls != 0 {
-		enableTLS = true
-		if s.Tls == 2 {
-			enableREALITY = true
-		}
-	}
-
-	// Create GeneralNodeInfo
-	return &api.NodeInfo{
-		NodeType:          c.NodeType,
-		NodeID:            c.NodeID,
-		Port:              uint32(s.ServerPort),
-		AlterID:           0,
-		TransportProtocol: s.Network,
-		EnableTLS:         enableTLS,
-		Path:              s.NetworkSettings.Path,
-		Host:              host,
-		EnableVless:       c.EnableVless,
-		VlessFlow:         s.VlessFlow,
-		ServiceName:       s.NetworkSettings.ServiceName,
-		Header:            header,
-		EnableREALITY:     enableREALITY,
-		REALITYConfig:     &realityconfig,
-		NameServerConfig:  s.parseDNSConfig(),
 	}, nil
 }
 

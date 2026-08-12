@@ -234,13 +234,6 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 				c.logger.Print(err)
 				return nil
 			}
-			if c.nodeInfo.NodeType == "Shadowsocks-Plugin" {
-				err = c.removeOldTag(fmt.Sprintf("dokodemo-door_%s+1", c.Tag))
-			}
-			if err != nil {
-				c.logger.Print(err)
-				return nil
-			}
 			// Add new tag
 			c.nodeInfo = newNodeInfo
 			c.Tag = c.buildNodeTag()
@@ -330,40 +323,7 @@ func (c *Controller) removeOldTag(oldTag string) (err error) {
 }
 
 func (c *Controller) addNewTag(newNodeInfo *api.NodeInfo) (err error) {
-	if newNodeInfo.NodeType != "Shadowsocks-Plugin" {
-		inboundConfig, err := InboundBuilder(c.config, newNodeInfo, c.Tag)
-		if err != nil {
-			return err
-		}
-		err = c.addInbound(inboundConfig)
-		if err != nil {
-
-			return err
-		}
-		outBoundConfig, err := OutboundBuilder(c.config, newNodeInfo, c.Tag)
-		if err != nil {
-
-			return err
-		}
-		err = c.addOutbound(outBoundConfig)
-		if err != nil {
-
-			return err
-		}
-
-	} else {
-		return c.addInboundForSSPlugin(*newNodeInfo)
-	}
-	return nil
-}
-
-func (c *Controller) addInboundForSSPlugin(newNodeInfo api.NodeInfo) (err error) {
-	// Shadowsocks-Plugin require a separate inbound for other TransportProtocol likes: ws, grpc
-	fakeNodeInfo := newNodeInfo
-	fakeNodeInfo.TransportProtocol = "tcp"
-	fakeNodeInfo.EnableTLS = false
-	// Add a regular Shadowsocks inbound and outbound
-	inboundConfig, err := InboundBuilder(c.config, &fakeNodeInfo, c.Tag)
+	inboundConfig, err := InboundBuilder(c.config, newNodeInfo, c.Tag)
 	if err != nil {
 		return err
 	}
@@ -372,31 +332,7 @@ func (c *Controller) addInboundForSSPlugin(newNodeInfo api.NodeInfo) (err error)
 
 		return err
 	}
-	outBoundConfig, err := OutboundBuilder(c.config, &fakeNodeInfo, c.Tag)
-	if err != nil {
-
-		return err
-	}
-	err = c.addOutbound(outBoundConfig)
-	if err != nil {
-
-		return err
-	}
-	// Add an inbound for upper streaming protocol
-	fakeNodeInfo = newNodeInfo
-	fakeNodeInfo.Port++
-	fakeNodeInfo.NodeType = "dokodemo-door"
-	dokodemoTag := fmt.Sprintf("dokodemo-door_%s+1", c.Tag)
-	inboundConfig, err = InboundBuilder(c.config, &fakeNodeInfo, dokodemoTag)
-	if err != nil {
-		return err
-	}
-	err = c.addInbound(inboundConfig)
-	if err != nil {
-
-		return err
-	}
-	outBoundConfig, err = OutboundBuilder(c.config, &fakeNodeInfo, dokodemoTag)
+	outBoundConfig, err := OutboundBuilder(c.config, newNodeInfo, c.Tag)
 	if err != nil {
 
 		return err
@@ -416,8 +352,6 @@ func (c *Controller) addNewUser(userInfo *[]api.UserInfo, nodeInfo *api.NodeInfo
 		users = c.buildTrojanUser(userInfo)
 	case "Shadowsocks":
 		users = c.buildSSUser(userInfo, nodeInfo.CypherMethod)
-	case "Shadowsocks-Plugin":
-		users = c.buildSSPluginUser(userInfo)
 	default:
 		return fmt.Errorf("unsupported node type: %s", nodeInfo.NodeType)
 	}

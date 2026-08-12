@@ -1,12 +1,7 @@
 package newV2board
 
-import (
-	"encoding/json"
-)
-
 type serverConfig struct {
 	shadowsocks
-	v2ray
 	trojan
 
 	ServerPort int `json:"server_port"`
@@ -25,27 +20,6 @@ type shadowsocks struct {
 		Host string `json:"host"`
 	} `json:"obfs_settings"`
 	ServerKey string `json:"server_key"`
-}
-
-type v2ray struct {
-	Network         string `json:"network"`
-	NetworkSettings struct {
-		Path        string           `json:"path"`
-		Host        string           `json:"host"`
-		Headers     *json.RawMessage `json:"headers"`
-		ServiceName string           `json:"serviceName"`
-		Header      *json.RawMessage `json:"header"`
-	} `json:"networkSettings"`
-	VlessFlow   string `json:"flow"`
-	TlsSettings struct {
-		ServerPort string `json:"server_port"`
-		Dest       string `json:"dest"`
-		Xver       uint64 `json:"xver,string"`
-		Sni        string `json:"server_name"`
-		PrivateKey string `json:"private_key"`
-		ShortId    string `json:"short_id"`
-	} `json:"tls_settings"`
-	Tls int `json:"tls"`
 }
 
 type trojan struct {

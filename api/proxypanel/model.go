@@ -9,29 +9,6 @@ type Response struct {
 	Message string          `json:"message"`
 }
 
-type V2rayNodeInfo struct {
-	ID            int    `json:"id"`
-	IsUDP         bool   `json:"is_udp"`
-	SpeedLimit    uint64 `json:"speed_limit"`
-	ClientLimit   int    `json:"client_limit"`
-	PushPort      int    `json:"push_port"`
-	Secret        string `json:"secret"`
-	Key           string `json:"key"`
-	Cert          string `json:"pem"`
-	V2License     string `json:"v2_license"`
-	V2AlterID     uint16 `json:"v2_alter_id"`
-	V2Port        uint32 `json:"v2_port"`
-	V2Method      string `json:"v2_method"`
-	V2Net         string `json:"v2_net"`
-	V2Type        string `json:"v2_type"`
-	V2Host        string `json:"v2_host"`
-	V2Path        string `json:"v2_path"`
-	V2TLS         bool   `json:"v2_tls"`
-	V2Cdn         bool   `json:"v2_cdn"`
-	V2TLSProvider string `json:"v2_tls_provider"`
-	RedirectUrl   string `json:"redirect_url"`
-}
-
 type ShadowsocksNodeInfo struct {
 	ID          int    `json:"id"`
 	SpeedLimit  uint64 `json:"speed_limit"`
@@ -61,12 +38,6 @@ type NodeStatus struct {
 type NodeOnline struct {
 	UID int    `json:"uid"`
 	IP  string `json:"ip"`
-}
-
-type VMessUser struct {
-	UID        int    `json:"uid"`
-	VmessUID   string `json:"vmess_uid"`
-	SpeedLimit uint64 `json:"speed_limit"`
 }
 
 type TrojanUser struct {

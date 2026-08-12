@@ -22,10 +22,7 @@ import (
 func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.InboundHandlerConfig, error) {
 	inboundDetourConfig := &conf.InboundDetourConfig{}
 	// Build Listen IP address
-	if nodeInfo.NodeType == "Shadowsocks-Plugin" {
-		// Shdowsocks listen in 127.0.0.1 for safety
-		inboundDetourConfig.ListenOn = &conf.Address{Address: net.ParseAddress("127.0.0.1")}
-	} else if config.ListenIP != "" {
+	if config.ListenIP != "" {
 		ipAddress := net.ParseAddress(config.ListenIP)
 		inboundDetourConfig.ListenOn = &conf.Address{Address: ipAddress}
 	}
@@ -71,7 +68,7 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 		} else {
 			proxySetting = &conf.TrojanServerConfig{}
 		}
-	case "Shadowsocks", "Shadowsocks-Plugin":
+	case "Shadowsocks":
 		protocol = "shadowsocks"
 		cipher := strings.ToLower(nodeInfo.CypherMethod)
 
@@ -96,17 +93,8 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 
 		proxySetting.NetworkList = &conf.NetworkList{"tcp", "udp"}
 
-	case "dokodemo-door":
-		protocol = "dokodemo-door"
-		proxySetting = struct {
-			Host        string   `json:"address"`
-			NetworkList []string `json:"network"`
-		}{
-			Host:        "v1.mux.cool",
-			NetworkList: []string{"tcp", "udp"},
-		}
 	default:
-		return nil, fmt.Errorf("unsupported node type: %s; supported types: Trojan, Shadowsocks, and Shadowsocks-Plugin", nodeInfo.NodeType)
+		return nil, fmt.Errorf("unsupported node type: %s; supported types: Trojan and Shadowsocks", nodeInfo.NodeType)
 	}
 
 	setting, err := json.Marshal(proxySetting)
@@ -124,24 +112,11 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 		return nil, fmt.Errorf("convert TransportProtocol failed: %s", err)
 	}
 
-	switch networkType {
-	case "tcp":
-		tcpSetting := &conf.TCPConfig{
-			AcceptProxyProtocol: config.EnableProxyProtocol,
-			HeaderConfig:        nodeInfo.Header,
-		}
-		streamSetting.TCPSettings = tcpSetting
-	case "websocket":
-		headers := make(map[string]string)
-		headers["Host"] = nodeInfo.Host
-		wsSettings := &conf.WebSocketConfig{
-			AcceptProxyProtocol: config.EnableProxyProtocol,
-			Host:                nodeInfo.Host,
-			Path:                nodeInfo.Path,
-			Headers:             headers,
-		}
-		streamSetting.WSSettings = wsSettings
+	tcpSetting := &conf.TCPConfig{
+		AcceptProxyProtocol: config.EnableProxyProtocol,
+		HeaderConfig:        nodeInfo.Header,
 	}
+	streamSetting.TCPSettings = tcpSetting
 	streamSetting.Network = &transportProtocol
 
 	// Build TLS settings.
@@ -159,7 +134,7 @@ func InboundBuilder(config *Config, nodeInfo *api.NodeInfo, tag string) (*core.I
 	}
 
 	// Support ProxyProtocol for any transport protocol
-	if networkType != "tcp" && networkType != "ws" && config.EnableProxyProtocol {
+	if networkType != "tcp" && config.EnableProxyProtocol {
 		sockoptConfig := &conf.SocketConfig{
 			AcceptProxyProtocol: config.EnableProxyProtocol,
 		}

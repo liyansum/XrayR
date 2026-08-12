@@ -30,8 +30,8 @@ A Xray backend framework that can easily support many panels.
 ## 特点
 
 * 永久开源且免费。
-* 精简构建仅支持 Trojan、Shadowsocks 和 Shadowsocks-Plugin。
-* 支持 TCP、WebSocket 与 TLS；不包含 VMess、VLESS、REALITY、gRPC、mKCP/KCP、HTTPUpgrade 和 XHTTP。
+* 精简构建仅支持 Trojan、Shadowsocks（含 Shadowsocks 2022）、HTTP 和 SOCKS。
+* 代理传输仅保留 TCP、UDP 与 TLS；不包含 VMess、VLESS、REALITY、WebSocket、gRPC、mKCP/KCP、HTTPUpgrade、XHTTP、TUN、WireGuard、Hysteria 和 FinalMask。
 * 支持单实例对接多面板、多节点，无需重复启动。
 * 支持限制在线IP
 * 支持节点端口级别、用户级别限速。
@@ -52,7 +52,7 @@ A Xray backend framework that can easily support many panels.
 ## 支持前端
 
 
-各面板仅可使用其 Trojan、Shadowsocks 或 Shadowsocks-Plugin 节点类型；已裁剪的协议节点会在启动阶段被明确拒绝。
+各面板仅可使用其 Trojan 或 Shadowsocks 节点类型；已裁剪的协议节点会在启动阶段被明确拒绝。
 
 ## 软件安装
 

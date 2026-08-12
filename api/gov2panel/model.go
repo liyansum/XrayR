@@ -3,23 +3,12 @@ package gov2panel
 import "encoding/json"
 
 type serverConfig struct {
-	v2ray
 	shadowsocks
-	//---
+	Port   string           `json:"port"`
+	Host   string           `json:"host"`
+	Sni    string           `json:"sni"`
 	Routes []route          `json:"routes"`
 	Header *json.RawMessage `json:"header"`
-}
-
-type v2ray struct {
-	Port string `json:"port"`
-	Scy  string `json:"scy"`
-	Net  string `json:"net"`
-	Type string `json:"type"`
-	Host string `json:"host"`
-	Path string `json:"path"`
-	TLS  string `json:"tls"`
-	Sni  string `json:"sni"`
-	Alpn string `json:"alpn"`
 }
 
 type shadowsocks struct {

@@ -18,8 +18,6 @@ type APIClient struct {
 	NodeID           int
 	Key              string
 	NodeType         string
-	EnableVless      bool
-	VlessFlow        string
 	SpeedLimit       float64
 	DeviceLimit      int
 	LocalRuleList    []api.DetectRule
@@ -61,8 +59,6 @@ func New(apiConfig *api.Config) *APIClient {
 		Key:           apiConfig.Key,
 		APIHost:       apiConfig.APIHost,
 		NodeType:      apiConfig.NodeType,
-		EnableVless:   apiConfig.EnableVless,
-		VlessFlow:     apiConfig.VlessFlow,
 		SpeedLimit:    apiConfig.SpeedLimit,
 		DeviceLimit:   apiConfig.DeviceLimit,
 		LocalRuleList: localRuleList,
@@ -283,86 +279,22 @@ func (c *APIClient) ParseUserListResponse(userInfoResponse *[]User) (*[]api.User
 }
 
 func (c *APIClient) ParseNodeInfo(nodeInfoResponse *Server) (*api.NodeInfo, error) {
-	var (
-		speedLimit                            uint64 = 0
-		enableTLS, enableVless, enableREALITY bool
-		alterID                               uint16 = 0
-		tlsType, transportProtocol            string
-	)
-
 	nodeConfig := nodeInfoResponse
-	port := uint32(nodeConfig.Port)
-
+	var enableTLS bool
 	switch c.NodeType {
 	case "Shadowsocks":
-		transportProtocol = "tcp"
-	case "V2ray":
-		transportProtocol = nodeConfig.Network
-		tlsType = nodeConfig.Security
-
-		if tlsType == "tls" || tlsType == "xtls" {
-			enableTLS = true
-		}
-		if tlsType == "reality" {
-			enableREALITY = true
-			enableVless = true
-		}
 	case "Trojan":
 		enableTLS = true
-		tlsType = "tls"
-		transportProtocol = "tcp"
+	default:
+		return nil, fmt.Errorf("unsupported node type: %s", c.NodeType)
 	}
 
-	// parse reality config
-	realityConfig := new(api.REALITYConfig)
-	if nodeConfig.RealitySettings != nil {
-		r := new(RealitySettings)
-		json.Unmarshal(nodeConfig.RealitySettings, r)
-		realityConfig = &api.REALITYConfig{
-			Dest:             r.Dest,
-			ProxyProtocolVer: r.ProxyProtocolVer,
-			ServerNames:      r.ServerNames,
-			PrivateKey:       r.PrivateKey,
-			MinClientVer:     r.MinClientVer,
-			MaxClientVer:     r.MaxClientVer,
-			MaxTimeDiff:      r.MaxTimeDiff,
-			ShortIds:         r.ShortIds,
-		}
-	}
-	wsConfig := new(WsSettings)
-	if nodeConfig.WsSettings != nil {
-		json.Unmarshal(nodeConfig.WsSettings, wsConfig)
-	}
-
-	grpcConfig := new(GrpcSettigns)
-	if nodeConfig.GrpcSettings != nil {
-		json.Unmarshal(nodeConfig.GrpcSettings, grpcConfig)
-	}
-
-	tcpConfig := new(TcpSettings)
-	if nodeConfig.TcpSettings != nil {
-		json.Unmarshal(nodeConfig.TcpSettings, tcpConfig)
-	}
-
-	// Create GeneralNodeInfo
-	nodeInfo := &api.NodeInfo{
+	return &api.NodeInfo{
 		NodeType:          c.NodeType,
 		NodeID:            c.NodeID,
-		Port:              port,
-		SpeedLimit:        speedLimit,
-		AlterID:           alterID,
-		TransportProtocol: transportProtocol,
-		Host:              wsConfig.Headers.Host,
-		Path:              wsConfig.Path,
+		Port:              uint32(nodeConfig.Port),
+		TransportProtocol: "tcp",
 		EnableTLS:         enableTLS,
-		EnableVless:       enableVless,
-		VlessFlow:         nodeConfig.Flow,
 		CypherMethod:      nodeConfig.Method,
-		ServiceName:       grpcConfig.ServiceName,
-		Header:            tcpConfig.Header,
-		EnableREALITY:     enableREALITY,
-		REALITYConfig:     realityConfig,
-	}
-
-	return nodeInfo, nil
+	}, nil
 }
