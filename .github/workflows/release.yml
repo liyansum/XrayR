@@ -56,8 +56,9 @@ jobs:
           mkdir -p dist
           go build -trimpath -ldflags="-s -w" \
             -o dist/XrayR-linux-amd64-v3 .
-          sha256sum dist/XrayR-linux-amd64-v3 \
-            > dist/XrayR-linux-amd64-v3.sha256
+          cd dist
+          sha256sum XrayR-linux-amd64-v3 \
+            > XrayR-linux-amd64-v3.sha256
 
       - name: Publish GitHub release
         env:
