@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/eko/gocache/lib/v4/cache"
@@ -37,8 +38,8 @@ type InboundInfo struct {
 		config         *GlobalDeviceLimitConfig
 		globalOnlineIP *marshaler.Marshaler
 	}
-	AliveList     map[int]int // Key: Uid, value: alive_ip
-	OldUserOnline *sync.Map   // Key: Ip, value: Uid
+	aliveList     atomic.Pointer[map[int]int] // Key: Uid, value: alive_ip
+	OldUserOnline *sync.Map                   // Key: Ip, value: Uid
 }
 
 type Limiter struct {
@@ -49,6 +50,20 @@ func New() *Limiter {
 	return &Limiter{
 		InboundInfo: new(sync.Map),
 	}
+}
+
+// SetAliveList atomically publishes the latest immutable alive-device map.
+// API clients replace this map after decoding instead of mutating it in place.
+func (i *InboundInfo) SetAliveList(alive map[int]int) {
+	i.aliveList.Store(&alive)
+}
+
+func (i *InboundInfo) aliveCount(uid int) int {
+	alive := i.aliveList.Load()
+	if alive == nil {
+		return 0
+	}
+	return (*alive)[uid]
 }
 
 func (l *Limiter) AddInboundLimiter(tag string, nodeSpeedLimit uint64, userList *[]api.UserInfo, globalLimit *GlobalDeviceLimitConfig) error {
@@ -183,37 +198,40 @@ func (l *Limiter) GetUserBucket(tag string, email string, ip string, isSourceTCP
 
 		// Local device limit, only for TCP connection
 		if isSourceTCP {
-			ipMap := new(sync.Map)
-			ipMap.Store(ip, uid)
-			aliveIp := inboundInfo.AliveList[uid]
+			aliveIP := inboundInfo.aliveCount(uid)
 			// If any device is online
-			if v, ok := inboundInfo.UserOnlineIP.LoadOrStore(email, ipMap); ok {
+			if v, ok := inboundInfo.UserOnlineIP.Load(email); ok {
 				ipMap := v.(*sync.Map)
 				// If this is a new ip
 				if _, ok := ipMap.LoadOrStore(ip, uid); !ok {
-					if deviceLimit > 0 {
-						if deviceLimit <= aliveIp {
-							ipMap.Delete(ip)
-							return nil, false, true
-						}
-					}
-				}
-			} else if v, ok := inboundInfo.OldUserOnline.Load(ip); ok {
-				if v.(int) == uid {
-					inboundInfo.OldUserOnline.Delete(ip)
-				}
-			} else {
-				if deviceLimit > 0 {
-					if deviceLimit <= aliveIp {
-						inboundInfo.UserOnlineIP.Delete(email)
+					if deviceLimit > 0 && deviceLimit <= aliveIP {
+						ipMap.Delete(ip)
 						return nil, false, true
 					}
+				}
+			} else {
+				newIPMap := new(sync.Map)
+				newIPMap.Store(ip, uid)
+				actual, loaded := inboundInfo.UserOnlineIP.LoadOrStore(email, newIPMap)
+				if loaded {
+					ipMap := actual.(*sync.Map)
+					if _, ok := ipMap.LoadOrStore(ip, uid); !ok && deviceLimit > 0 && deviceLimit <= aliveIP {
+						ipMap.Delete(ip)
+						return nil, false, true
+					}
+				} else if v, ok := inboundInfo.OldUserOnline.Load(ip); ok {
+					if v.(int) == uid {
+						inboundInfo.OldUserOnline.Delete(ip)
+					}
+				} else if deviceLimit > 0 && deviceLimit <= aliveIP {
+					inboundInfo.UserOnlineIP.Delete(email)
+					return nil, false, true
 				}
 			}
 		}
 
 		// GlobalLimit
-		if inboundInfo.GlobalLimit.config != nil && inboundInfo.GlobalLimit.config.Enable {
+		if deviceLimit > 0 && inboundInfo.GlobalLimit.config != nil && inboundInfo.GlobalLimit.config.Enable {
 			if reject := globalLimit(inboundInfo, email, uid, ip, deviceLimit); reject {
 				return nil, false, true
 			}
@@ -222,13 +240,12 @@ func (l *Limiter) GetUserBucket(tag string, email string, ip string, isSourceTCP
 		// Speed limit
 		limit := determineRate(nodeLimit, userLimit) // Determine the speed limit rate
 		if limit > 0 {
-			limiter := rate.NewLimiter(rate.Limit(limit), int(limit)) // Byte/s
-			if v, ok := inboundInfo.BucketHub.LoadOrStore(email, limiter); ok {
-				bucket := v.(*rate.Limiter)
-				return bucket, true, false
-			} else {
-				return limiter, true, false
+			if v, ok := inboundInfo.BucketHub.Load(email); ok {
+				return v.(*rate.Limiter), true, false
 			}
+			newLimiter := rate.NewLimiter(rate.Limit(limit), int(limit)) // Byte/s
+			actual, _ := inboundInfo.BucketHub.LoadOrStore(email, newLimiter)
+			return actual.(*rate.Limiter), true, false
 		} else {
 			return nil, false, false
 		}

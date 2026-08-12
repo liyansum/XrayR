@@ -119,7 +119,7 @@ func (c *Controller) Start() error {
 	if v2b, ok := c.apiClient.(*newV2board.APIClient); ok {
 		if v, ok := c.dispatcher.Limiter.InboundInfo.Load(c.Tag); ok {
 			inboundinfo := v.(*limiter.InboundInfo)
-			inboundinfo.AliveList = v2b.AliveMap.Alive
+			inboundinfo.SetAliveList(v2b.AliveMap.Alive)
 		}
 	}
 
@@ -211,7 +211,7 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 	if v2b, ok := c.apiClient.(*newV2board.APIClient); ok {
 		if v, ok := c.dispatcher.Limiter.InboundInfo.Load(c.Tag); ok {
 			inboundinfo := v.(*limiter.InboundInfo)
-			inboundinfo.AliveList = v2b.AliveMap.Alive
+			inboundinfo.SetAliveList(v2b.AliveMap.Alive)
 		}
 	}
 	if err != nil {
@@ -529,8 +529,7 @@ func (c *Controller) userInfoMonitor() (err error) {
 
 	// Get User traffic
 	var userTraffic []api.UserTraffic
-	var upCounterList []stats.Counter
-	var downCounterList []stats.Counter
+	var trafficSnapshots []trafficCounterSnapshot
 	AutoSpeedLimit := int64(c.config.AutoSpeedLimitConfig.Limit)
 	UpdatePeriodic := int64(c.config.UpdatePeriodic)
 	limitedUsers := make([]api.UserInfo, 0)
@@ -562,10 +561,10 @@ func (c *Controller) userInfoMonitor() (err error) {
 				Download: down})
 
 			if upCounter != nil {
-				upCounterList = append(upCounterList, upCounter)
+				trafficSnapshots = append(trafficSnapshots, trafficCounterSnapshot{counter: upCounter, value: up})
 			}
 			if downCounter != nil {
-				downCounterList = append(downCounterList, downCounter)
+				trafficSnapshots = append(trafficSnapshots, trafficCounterSnapshot{counter: downCounter, value: down})
 			}
 		} else {
 			delete(c.warnedUsers, user)
@@ -582,11 +581,12 @@ func (c *Controller) userInfoMonitor() (err error) {
 		if !c.config.DisableUploadTraffic {
 			err = c.apiClient.ReportUserTraffic(&userTraffic)
 		}
-		// If report traffic error, not clear the traffic
+		// The counters were atomically snapshotted before reporting. Restore only
+		// the snapshot on failure; traffic generated during the request remains in
+		// the live counters for the next report.
 		if err != nil {
+			restoreTraffic(trafficSnapshots)
 			c.logger.Print(err)
-		} else {
-			c.resetTraffic(&upCounterList, &downCounterList)
 		}
 	}
 

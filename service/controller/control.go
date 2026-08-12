@@ -110,25 +110,30 @@ func (c *Controller) getTraffic(email string) (up int64, down int64, upCounter s
 	downName := "user>>>" + email + ">>>traffic>>>downlink"
 	upCounter = c.stm.GetCounter(upName)
 	downCounter = c.stm.GetCounter(downName)
-	if upCounter != nil && upCounter.Value() != 0 {
-		up = upCounter.Value()
-	} else {
-		upCounter = nil
-	}
-	if downCounter != nil && downCounter.Value() != 0 {
-		down = downCounter.Value()
-	} else {
-		downCounter = nil
-	}
+	up, upCounter = snapshotTrafficCounter(upCounter)
+	down, downCounter = snapshotTrafficCounter(downCounter)
 	return up, down, upCounter, downCounter
 }
 
-func (c *Controller) resetTraffic(upCounterList *[]stats.Counter, downCounterList *[]stats.Counter) {
-	for _, upCounter := range *upCounterList {
-		upCounter.Set(0)
+func snapshotTrafficCounter(counter stats.Counter) (int64, stats.Counter) {
+	if counter == nil {
+		return 0, nil
 	}
-	for _, downCounter := range *downCounterList {
-		downCounter.Set(0)
+	value := counter.Set(0)
+	if value == 0 {
+		return 0, nil
+	}
+	return value, counter
+}
+
+type trafficCounterSnapshot struct {
+	counter stats.Counter
+	value   int64
+}
+
+func restoreTraffic(snapshots []trafficCounterSnapshot) {
+	for _, snapshot := range snapshots {
+		snapshot.counter.Add(snapshot.value)
 	}
 }
 
