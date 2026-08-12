@@ -1,102 +1,78 @@
-## 本分支需要配合修改过的V2board面板进行使用
-https://github.com/wyx2685/v2board
+# XrayR Dedicated Edition
 
-# XrayR
-[![](https://img.shields.io/badge/TgChat-@UnOfficialV2board讨论-blue.svg)](https://t.me/unofficialV2board)
-[![](https://img.shields.io/badge/TgChat-@XrayR讨论-blue.svg)](https://t.me/XrayR_project)
-[![](https://img.shields.io/badge/Channel-@XrayR通知-blue.svg)](https://t.me/XrayR_channel)
-![](https://img.shields.io/github/stars/wyx2685/XrayR)
-![](https://img.shields.io/github/forks/wyx2685/XrayR)
-![](https://github.com/wyx2685/XrayR/actions/workflows/release.yml/badge.svg)
-![](https://github.com/wyx2685/XrayR/actions/workflows/docker.yml/badge.svg)
-[![Github All Releases](https://img.shields.io/github/downloads/wyx2685/XrayR/total.svg)]()
+This repository provides a reduced XrayR service for deployments that use a
+small, explicitly supported proxy surface. It embeds the paired dedicated Xray
+core and preserves panel synchronization, user updates, traffic accounting,
+limits and reporting.
 
+## Supported scope
 
-[English](https://github.com/wyx2685/XrayR/blob/master/README-en.md)|[Iranian](https://github.com/wyx2685/XrayR/blob/master/README_Fa.md)|[Vietnamese](https://github.com/wyx2685/XrayR/blob/master/README-vi.md)
+- Managed node protocols: Trojan, Shadowsocks and Shadowsocks 2022.
+- Custom inbound protocols: Trojan, Shadowsocks and Shadowsocks 2022, SOCKS,
+  HTTP and mixed HTTP/SOCKS.
+- Outbound protocols: Shadowsocks and Shadowsocks 2022, SOCKS, direct and block.
+- Networking: TCP, UDP, TLS, routing, DNS, DoH and DoQ.
 
-A Xray backend framework that can easily support many panels.
+VMess, VLESS, REALITY, WebSocket, gRPC, mKCP/KCP, HTTPUpgrade,
+XHTTP/SplitHTTP, TUN, WireGuard, Hysteria, FinalMask, SS-Plugin and automatic
+ACME certificate management are not included.
 
-一个基于Xray的后端框架，支持V2ay,Trojan,Shadowsocks协议，极易扩展，支持多面板对接。
+Unsupported legacy node and custom-proxy entries are logged and skipped so
+that stale configuration does not prevent the retained nodes from starting.
 
-如果您喜欢本项目，可以右上角点个star+watch，持续关注本项目的进展。
+## TLS behavior
 
-使用教程：[详细使用教程](https://xrayr-project.github.io/XrayR-doc/)
+- File-based certificates can be reloaded without restarting the process.
+- TLS session resumption is enabled by default. Set
+  `DisableSessionResumption: true` to disable it.
+- With the expected ECDSA certificate, TLS 1.2 uses only ECDHE-ECDSA AES-GCM or
+  ChaCha20-Poly1305. The two legacy ECDSA CBC suites are excluded.
+- TLS 1.3 and Go 1.26 hybrid ML-KEM key exchanges remain enabled.
 
+Certificate issuance and renewal must be handled outside XrayR. Configure a
+certificate and key with `CertMode: file`; use `CertMode: none` when local TLS
+termination is not required.
 
-## 免责声明
-
-本项目只是本人个人学习开发并维护，本人不保证任何可用性，也不对使用本软件造成的任何后果负责。
-
-## 特点
-
-* 永久开源且免费。
-* 精简构建仅支持 Trojan、Shadowsocks（含 Shadowsocks 2022）、HTTP 和 SOCKS。
-* 代理传输仅保留 TCP、UDP 与 TLS；不包含 VMess、VLESS、REALITY、WebSocket、gRPC、mKCP/KCP、HTTPUpgrade、XHTTP、TUN、WireGuard、Hysteria 和 FinalMask。
-* 支持单实例对接多面板、多节点，无需重复启动。
-* 支持限制在线IP
-* 支持节点端口级别、用户级别限速。
-* 配置简单明了。
-* 修改配置自动重启实例。
-* 方便编译和升级，可以快速更新核心版本， 支持Xray-core新特性。
-
-## 功能介绍
-
-| 功能 | trojan | shadowsocks |
-|---|---|---|
-| 获取节点与用户信息 | √ | √ |
-| 用户流量与服务器信息上报 | √ | √ |
-| 在线人数统计与限制 | √ | √ |
-| 审计规则、节点与用户限速 | √ | √ |
-| 自定义 DNS | √ | √ |
-
-## 支持前端
-
-
-各面板仅可使用其 Trojan 或 Shadowsocks 节点类型；已裁剪的协议节点会在启动阶段被明确拒绝。
-
-## 软件安装
-
-### 本地生产构建
+## Production build
 
 ```bash
 ./build.sh
 ```
 
-默认使用 `CGO_ENABLED=0`、`GOAMD64=v3`、`-trimpath` 和
-`-ldflags="-s -w"`。生成的二进制要求 x86-64-v3 兼容 CPU；需要兼容旧 CPU
-时可使用 `GOAMD64=v1 ./build.sh`。
+The default build is a static Linux amd64 binary compiled with:
 
-### 一键安装
+- `CGO_ENABLED=0`
+- `GOAMD64=v3`
+- `-trimpath`
+- `-ldflags="-s -w"`
 
+An x86-64-v3 capable processor is required. For an older processor, build with
+`GOAMD64=v1 ./build.sh`.
+
+To compile every package and test source without running tests that may contact
+panel endpoints:
+
+```bash
+go test -run '^$' ./...
 ```
-wget -N https://raw.githubusercontent.com/wyx2685/XrayR-release/master/install.sh && bash install.sh
-```
 
-### 手动安装
+## Release workflow
 
-[手动安装教程](https://xrayr-project.github.io/XrayR-doc/xrayr-xia-zai-he-an-zhuang/install/manual)
+The `Release dedicated XrayR` workflow is manual-only. It accepts a release tag,
+builds `XrayR-linux-amd64-v3`, generates a SHA-256 checksum and creates the
+corresponding GitHub release. Re-running it with an existing tag fails instead
+of replacing an existing release.
 
-## 配置文件及详细使用教程
+## Operational notes
 
-[详细使用教程](https://xrayr-project.github.io/XrayR-doc/)
+- Freedom/direct outbound permits local and public IPv6 destinations. Apply
+  destination restrictions with routing rules or the host firewall when needed.
+- Existing routing blocks remain effective.
+- Production configuration and panel credentials must not be committed.
+- The Xray core dependency is pinned to an exact fork pseudo-version in
+  `go.mod` and `go.sum`.
 
-## Thanks
+## License
 
-* [Project X](https://github.com/XTLS/)
-* [V2Fly](https://github.com/v2fly)
-* [VNet-V2ray](https://github.com/ProxyPanel/VNet-V2ray)
-* [Air-Universe](https://github.com/crossfw/Air-Universe)
-
-## Licence
-
-[Mozilla Public License Version 2.0](https://github.com/wyx2685/XrayR/blob/master/LICENSE)
-
-## Telgram
-
-[XrayR后端讨论](https://t.me/XrayR_project)
-
-[XrayR通知](https://t.me/XrayR_channel)
-
-## Stargazers over time
-
-[![Stargazers over time](https://starchart.cc/wyx2685/XrayR.svg)](https://starchart.cc/wyx2685/XrayR)
+This repository is distributed under the Mozilla Public License 2.0. See
+[LICENSE](LICENSE).

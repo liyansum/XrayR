@@ -1,0 +1,71 @@
+name: Release dedicated XrayR
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release tag, for example release26.8.12
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: 0
+      GOOS: linux
+      GOARCH: amd64
+      GOAMD64: v3
+      RELEASE_TAG: ${{ inputs.version }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Validate release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^release[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release tag: $RELEASE_TAG"
+            exit 1
+          fi
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release already exists: $RELEASE_TAG"
+            exit 1
+          fi
+
+      - name: Compile all packages
+        run: go test -run '^$' ./...
+
+      - name: Build release binary
+        run: |
+          mkdir -p dist
+          go build -trimpath -ldflags="-s -w" \
+            -o dist/XrayR-linux-amd64-v3 .
+          sha256sum dist/XrayR-linux-amd64-v3 \
+            > dist/XrayR-linux-amd64-v3.sha256
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            dist/XrayR-linux-amd64-v3 \
+            dist/XrayR-linux-amd64-v3.sha256 \
+            --target "$GITHUB_SHA" \
+            --title "$RELEASE_TAG" \
+            --notes "Dedicated Linux amd64-v3 build with the pinned optimized Xray core. The binary is static, stripped, and built with CGO disabled."
