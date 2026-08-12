@@ -71,6 +71,16 @@ A Xray backend framework that can easily support many panels.
 
 ## 软件安装
 
+### 本地生产构建
+
+```bash
+./build.sh
+```
+
+默认使用 `CGO_ENABLED=0`、`GOAMD64=v3`、`-trimpath` 和
+`-ldflags="-s -w"`。生成的二进制要求 x86-64-v3 兼容 CPU；需要兼容旧 CPU
+时可使用 `GOAMD64=v1 ./build.sh`。
+
 ### 一键安装
 
 ```
@@ -105,5 +115,3 @@ wget -N https://raw.githubusercontent.com/wyx2685/XrayR-release/master/install.s
 ## Stargazers over time
 
 [![Stargazers over time](https://starchart.cc/wyx2685/XrayR.svg)](https://starchart.cc/wyx2685/XrayR)
-
-

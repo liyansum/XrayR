@@ -31,9 +31,9 @@ type UserInfo struct {
 type InboundInfo struct {
 	Tag            string
 	NodeSpeedLimit uint64
-	UserInfo       *sync.Map // Key: Email value: UserInfo
-	BucketHub      *sync.Map // key: Email, value: *rate.Limiter
-	UserOnlineIP   *sync.Map // Key: Email, value: {Key: IP, value: UID}
+	userInfo       atomic.Pointer[map[string]UserInfo] // Immutable; key: Email
+	BucketHub      *sync.Map                           // key: Email, value: *rate.Limiter
+	UserOnlineIP   *sync.Map                           // Key: Email, value: {Key: IP, value: UID}
 	GlobalLimit    struct {
 		config         *GlobalDeviceLimitConfig
 		globalOnlineIP *marshaler.Marshaler
@@ -64,6 +64,41 @@ func (i *InboundInfo) aliveCount(uid int) int {
 		return 0
 	}
 	return (*alive)[uid]
+}
+
+func buildUserInfoMap(tag string, users []api.UserInfo) *map[string]UserInfo {
+	userMap := make(map[string]UserInfo, len(users))
+	for _, user := range users {
+		userMap[fmt.Sprintf("%s|%s|%d", tag, user.Email, user.UID)] = UserInfo{
+			UID:         user.UID,
+			SpeedLimit:  user.SpeedLimit,
+			DeviceLimit: user.DeviceLimit,
+		}
+	}
+	return &userMap
+}
+
+func (i *InboundInfo) updateUsers(tag string, users []api.UserInfo) {
+	for {
+		current := i.userInfo.Load()
+		next := make(map[string]UserInfo, len(users))
+		if current != nil {
+			next = make(map[string]UserInfo, len(*current)+len(users))
+			for email, info := range *current {
+				next[email] = info
+			}
+		}
+		for _, user := range users {
+			next[fmt.Sprintf("%s|%s|%d", tag, user.Email, user.UID)] = UserInfo{
+				UID:         user.UID,
+				SpeedLimit:  user.SpeedLimit,
+				DeviceLimit: user.DeviceLimit,
+			}
+		}
+		if i.userInfo.CompareAndSwap(current, &next) {
+			return
+		}
+	}
 }
 
 func (l *Limiter) AddInboundLimiter(tag string, nodeSpeedLimit uint64, userList *[]api.UserInfo, globalLimit *GlobalDeviceLimitConfig) error {
@@ -100,15 +135,7 @@ func (l *Limiter) AddInboundLimiter(tag string, nodeSpeedLimit uint64, userList 
 		inboundInfo.GlobalLimit.globalOnlineIP = marshaler.New(cacheManager)
 	}
 
-	userMap := new(sync.Map)
-	for _, u := range *userList {
-		userMap.Store(fmt.Sprintf("%s|%s|%d", tag, u.Email, u.UID), UserInfo{
-			UID:         u.UID,
-			SpeedLimit:  u.SpeedLimit,
-			DeviceLimit: u.DeviceLimit,
-		})
-	}
-	inboundInfo.UserInfo = userMap
+	inboundInfo.userInfo.Store(buildUserInfoMap(tag, *userList))
 	l.InboundInfo.Store(tag, inboundInfo) // Replace the old inbound info
 	return nil
 }
@@ -116,13 +143,10 @@ func (l *Limiter) AddInboundLimiter(tag string, nodeSpeedLimit uint64, userList 
 func (l *Limiter) UpdateInboundLimiter(tag string, updatedUserList *[]api.UserInfo) error {
 	if value, ok := l.InboundInfo.Load(tag); ok {
 		inboundInfo := value.(*InboundInfo)
-		// Update User info
+		// Publish all user changes as one immutable snapshot. CAS avoids losing
+		// concurrent updates from the node and traffic monitor tasks.
+		inboundInfo.updateUsers(tag, *updatedUserList)
 		for _, u := range *updatedUserList {
-			inboundInfo.UserInfo.Store(fmt.Sprintf("%s|%s|%d", tag, u.Email, u.UID), UserInfo{
-				UID:         u.UID,
-				SpeedLimit:  u.SpeedLimit,
-				DeviceLimit: u.DeviceLimit,
-			})
 			// Update old limiter bucket
 			limit := determineRate(inboundInfo.NodeSpeedLimit, u.SpeedLimit)
 			if limit > 0 {
@@ -189,11 +213,14 @@ func (l *Limiter) GetUserBucket(tag string, email string, ip string, isSourceTCP
 		inboundInfo := value.(*InboundInfo)
 		nodeLimit := inboundInfo.NodeSpeedLimit
 
-		if v, ok := inboundInfo.UserInfo.Load(email); ok {
-			u := v.(UserInfo)
-			uid = u.UID
-			userLimit = u.SpeedLimit
-			deviceLimit = u.DeviceLimit
+		users := inboundInfo.userInfo.Load()
+		if users != nil {
+			u, ok := (*users)[email]
+			if ok {
+				uid = u.UID
+				userLimit = u.SpeedLimit
+				deviceLimit = u.DeviceLimit
+			}
 		}
 
 		// Local device limit, only for TCP connection
