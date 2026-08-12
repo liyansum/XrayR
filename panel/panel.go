@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/wyx2685/XrayR/api/bunpanel"
@@ -36,6 +37,33 @@ type Panel struct {
 	Server      *core.Instance
 	Service     []service.Service
 	Running     bool
+}
+
+func supportedInboundProtocol(protocol string) bool {
+	switch strings.ToLower(strings.TrimSpace(protocol)) {
+	case "http", "mixed", "shadowsocks", "socks", "trojan":
+		return true
+	default:
+		return false
+	}
+}
+
+func supportedOutboundProtocol(protocol string) bool {
+	switch strings.ToLower(strings.TrimSpace(protocol)) {
+	case "blackhole", "block", "direct", "freedom", "shadowsocks", "socks":
+		return true
+	default:
+		return false
+	}
+}
+
+func supportedNodeType(nodeType string) bool {
+	switch strings.ToLower(strings.TrimSpace(nodeType)) {
+	case "trojan", "shadowsocks":
+		return true
+	default:
+		return false
+	}
 }
 
 func New(panelConfig *Config) *Panel {
@@ -106,6 +134,11 @@ func (p *Panel) loadCore(panelConfig *Config) *core.Instance {
 	}
 	var inBoundConfig []*core.InboundHandlerConfig
 	for _, config := range coreCustomInboundConfig {
+		if !supportedInboundProtocol(config.Protocol) {
+			log.Printf("Ignoring unsupported custom inbound protocol %q", config.Protocol)
+			continue
+		}
+		config.Protocol = strings.ToLower(strings.TrimSpace(config.Protocol))
 		oc, err := config.Build()
 		if err != nil {
 			log.Panicf("Failed to understand Inbound config, Please check: https://xtls.github.io/config/inbound.html for help: %s", err)
@@ -125,6 +158,11 @@ func (p *Panel) loadCore(panelConfig *Config) *core.Instance {
 	}
 	var outBoundConfig []*core.OutboundHandlerConfig
 	for _, config := range coreCustomOutboundConfig {
+		if !supportedOutboundProtocol(config.Protocol) {
+			log.Printf("Ignoring unsupported custom outbound protocol %q", config.Protocol)
+			continue
+		}
+		config.Protocol = strings.ToLower(strings.TrimSpace(config.Protocol))
 		oc, err := config.Build()
 		if err != nil {
 			log.Panicf("Failed to understand Outbound config, Please check: https://xtls.github.io/config/outbound.html for help: %s", err)
@@ -177,10 +215,15 @@ func (p *Panel) Start() {
 		if nodeConfig.ApiConfig == nil {
 			log.Panic("ApiConfig is required")
 		}
-		switch nodeConfig.ApiConfig.NodeType {
-		case "Trojan", "Shadowsocks":
-		default:
-			log.Panicf("Unsupported node type %q; this build only supports Trojan and Shadowsocks", nodeConfig.ApiConfig.NodeType)
+		if !supportedNodeType(nodeConfig.ApiConfig.NodeType) {
+			log.Printf("Ignoring unsupported node type %q; this build only supports Trojan and Shadowsocks", nodeConfig.ApiConfig.NodeType)
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(nodeConfig.ApiConfig.NodeType)) {
+		case "trojan":
+			nodeConfig.ApiConfig.NodeType = "Trojan"
+		case "shadowsocks":
+			nodeConfig.ApiConfig.NodeType = "Shadowsocks"
 		}
 		var apiClient api.API
 		switch nodeConfig.PanelType {
