@@ -1,6 +1,6 @@
 module github.com/wyx2685/XrayR
 
-go 1.23.1
+go 1.26
 
 require (
 	dario.cat/mergo v1.0.0
@@ -299,3 +299,10 @@ require (
 )
 
 replace github.com/exoscale/egoscale => github.com/exoscale/egoscale v0.102.3
+
+replace github.com/xtls/xray-core => github.com/liyansum/Xray-core v1.8.25-0.20250101120305-e80ca67feed9
+
+godebug (
+	tlsmlkem=1
+	tlssecpmlkem=1
+)

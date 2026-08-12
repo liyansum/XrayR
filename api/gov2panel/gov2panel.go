@@ -1,19 +1,15 @@
 package gov2panel
 
 import (
-	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/bitly/go-simplejson"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/gogf/gf/v2/util/gconv"
@@ -41,20 +37,7 @@ type APIClient struct {
 
 // New create an api instance
 func New(apiConfig *api.Config) *APIClient {
-	client := resty.New()
-	client.SetRetryCount(3)
-	if apiConfig.Timeout > 0 {
-		client.SetTimeout(time.Duration(apiConfig.Timeout) * time.Second)
-	} else {
-		client.SetTimeout(5 * time.Second)
-	}
-	client.OnError(func(req *resty.Request, err error) {
-		if v, ok := err.(*resty.ResponseError); ok {
-			// v.Response contains the last response from the server
-			// v.Err contains the original error
-			log.Print(v.Err)
-		}
-	})
+	client := api.NewPanelHTTPClient(apiConfig)
 	client.SetBaseURL(apiConfig.APIHost)
 	// Create Key for each requests
 	client.SetQueryParams(map[string]string{
@@ -63,7 +46,7 @@ func New(apiConfig *api.Config) *APIClient {
 		"token":     apiConfig.Key,
 	})
 	// Read local rule list
-	localRuleList := readLocalRuleList(apiConfig.RuleListPath)
+	localRuleList := api.ReadLocalRuleList(apiConfig.RuleListPath)
 	apiClient := &APIClient{
 		client:        client,
 		NodeID:        apiConfig.NodeID,
@@ -80,39 +63,6 @@ func New(apiConfig *api.Config) *APIClient {
 	return apiClient
 }
 
-// readLocalRuleList reads the local rule list file
-func readLocalRuleList(path string) (LocalRuleList []api.DetectRule) {
-	LocalRuleList = make([]api.DetectRule, 0)
-
-	if path != "" {
-		// open the file
-		file, err := os.Open(path)
-		defer file.Close()
-		// handle errors while opening
-		if err != nil {
-			log.Printf("Error when opening file: %s", err)
-			return LocalRuleList
-		}
-
-		fileScanner := bufio.NewScanner(file)
-
-		// read line by line
-		for fileScanner.Scan() {
-			LocalRuleList = append(LocalRuleList, api.DetectRule{
-				ID:      -1,
-				Pattern: regexp.MustCompile(fileScanner.Text()),
-			})
-		}
-		// handle first encountered error while reading
-		if err := fileScanner.Err(); err != nil {
-			log.Fatalf("Error while reading file: %s", err)
-			return
-		}
-	}
-
-	return LocalRuleList
-}
-
 // Describe return a description of the client
 func (c *APIClient) Describe() api.ClientInfo {
 	return api.ClientInfo{APIHost: c.APIHost, NodeID: c.NodeID, Key: c.Key, NodeType: c.NodeType}
@@ -120,7 +70,7 @@ func (c *APIClient) Describe() api.ClientInfo {
 
 // Debug set the client debug for client
 func (c *APIClient) Debug() {
-	c.client.SetDebug(true)
+	api.EnableSafeDebug(c.client)
 }
 
 func (c *APIClient) assembleURL(path string) string {
@@ -128,20 +78,7 @@ func (c *APIClient) assembleURL(path string) string {
 }
 
 func (c *APIClient) parseResponse(res *resty.Response, path string, err error) (*simplejson.Json, error) {
-	if err != nil {
-		return nil, fmt.Errorf("request %s failed: %v", c.assembleURL(path), err)
-	}
-
-	if res.StatusCode() > 399 {
-		return nil, fmt.Errorf("request %s failed: %s, %v", c.assembleURL(path), res.String(), err)
-	}
-
-	rtn, err := simplejson.NewJson(res.Body())
-	if err != nil {
-		return nil, fmt.Errorf("ret %s invalid", res.String())
-	}
-
-	return rtn, nil
+	return api.ParseJSONResponse(res, c.assembleURL(path), err, 399)
 }
 
 // GetNodeInfo will pull NodeInfo Config from panel
@@ -188,7 +125,7 @@ func (c *APIClient) GetNodeInfo() (nodeInfo *api.NodeInfo, err error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("parse node info failed: %s, \nError: %v", res.String(), err)
+		return nil, fmt.Errorf("parse node info failed: %s, \nError: %s", api.SanitizeResponse(res), api.RedactText(err.Error()))
 	}
 
 	return nodeInfo, nil

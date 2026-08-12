@@ -1,20 +1,15 @@
 package bunpanel
 
 import (
-	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/go-resty/resty/v2"
-	log "github.com/sirupsen/logrus"
 	"github.com/wyx2685/XrayR/api"
-	"os"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 type APIClient struct {
@@ -50,20 +45,7 @@ func (c *APIClient) GetNodeRule() (*[]api.DetectRule, error) {
 }
 
 func New(apiConfig *api.Config) *APIClient {
-	client := resty.New()
-	client.SetRetryCount(3)
-	if apiConfig.Timeout > 0 {
-		client.SetTimeout(time.Duration(apiConfig.Timeout) * time.Second)
-	} else {
-		client.SetTimeout(5 * time.Second)
-	}
-	client.OnError(func(req *resty.Request, err error) {
-		if v, ok := err.(*resty.ResponseError); ok {
-			// v.Response contains the last response from the server
-			// v.Err contains the original error
-			log.Print(v.Err)
-		}
-	})
+	client := api.NewPanelHTTPClient(apiConfig)
 	client.SetBaseURL(apiConfig.APIHost)
 	// Create Key for each requests
 	client.SetQueryParams(map[string]string{
@@ -72,7 +54,7 @@ func New(apiConfig *api.Config) *APIClient {
 		"token":    apiConfig.Key,
 	})
 	// Read local rule list
-	localRuleList := readLocalRuleList(apiConfig.RuleListPath)
+	localRuleList := api.ReadLocalRuleList(apiConfig.RuleListPath)
 	apiClient := &APIClient{
 		client:        client,
 		NodeID:        apiConfig.NodeID,
@@ -89,39 +71,6 @@ func New(apiConfig *api.Config) *APIClient {
 	return apiClient
 }
 
-// readLocalRuleList reads the local rule list file
-func readLocalRuleList(path string) (LocalRuleList []api.DetectRule) {
-	LocalRuleList = make([]api.DetectRule, 0)
-
-	if path != "" {
-		// open the file
-		file, err := os.Open(path)
-
-		// handle errors while opening
-		if err != nil {
-			log.Printf("Error when opening file: %s", err)
-			return LocalRuleList
-		}
-		defer file.Close()
-		fileScanner := bufio.NewScanner(file)
-
-		// read line by line
-		for fileScanner.Scan() {
-			LocalRuleList = append(LocalRuleList, api.DetectRule{
-				ID:      -1,
-				Pattern: regexp.MustCompile(fileScanner.Text()),
-			})
-		}
-		// handle first encountered error while reading
-		if err := fileScanner.Err(); err != nil {
-			log.Fatalf("Error while reading file: %s", err)
-			return
-		}
-	}
-
-	return LocalRuleList
-}
-
 // Describe return a description of the client
 func (c *APIClient) Describe() api.ClientInfo {
 	return api.ClientInfo{APIHost: c.APIHost, NodeID: c.NodeID, Key: c.Key, NodeType: c.NodeType}
@@ -129,7 +78,7 @@ func (c *APIClient) Describe() api.ClientInfo {
 
 // Debug set the client debug for client
 func (c *APIClient) Debug() {
-	c.client.SetDebug(true)
+	api.EnableSafeDebug(c.client)
 }
 
 func (c *APIClient) assembleURL(path string) string {
@@ -137,19 +86,14 @@ func (c *APIClient) assembleURL(path string) string {
 }
 
 func (c *APIClient) parseResponse(res *resty.Response, path string, err error) (*Response, error) {
-	if err != nil {
-		return nil, fmt.Errorf("request %s failed: %s", c.assembleURL(path), err)
-	}
-
-	if res.StatusCode() > 400 {
-		body := res.Body()
-		return nil, fmt.Errorf("request %s failed: %s, %v", c.assembleURL(path), string(body), err)
+	if err := api.CheckResponse(res, c.assembleURL(path), err, 400); err != nil {
+		return nil, err
 	}
 	response := res.Result().(*Response)
 
 	if response.StatusCode != 200 {
 		res, _ := json.Marshal(&response)
-		return nil, fmt.Errorf("statusCode %s invalid", string(res))
+		return nil, fmt.Errorf("statusCode %s invalid", api.RedactText(string(res)))
 	}
 	return response, nil
 }
@@ -184,12 +128,12 @@ func (c *APIClient) GetNodeInfo() (nodeInfo *api.NodeInfo, err error) {
 	nodeInfo, err = c.ParseNodeInfo(nodeInfoResponse)
 	if err != nil {
 		res, _ := json.Marshal(nodeInfoResponse)
-		return nil, fmt.Errorf("parse node info failed: %s, \nError: %s, \nPlease check the doc of custom_config for help: https://xrayr-project.github.io/XrayR-doc/dui-jie-sspanel/sspanel/sspanel_custom_config", string(res), err)
+		return nil, fmt.Errorf("parse node info failed: %s, \nError: %s, \nPlease check the doc of custom_config for help: https://xrayr-project.github.io/XrayR-doc/dui-jie-sspanel/sspanel/sspanel_custom_config", api.RedactText(string(res)), api.RedactText(err.Error()))
 	}
 
 	if err != nil {
 		res, _ := json.Marshal(nodeInfoResponse)
-		return nil, fmt.Errorf("parse node info failed: %s, \nError: %s", string(res), err)
+		return nil, fmt.Errorf("parse node info failed: %s, \nError: %s", api.RedactText(string(res)), api.RedactText(err.Error()))
 	}
 
 	return nodeInfo, nil
@@ -225,7 +169,7 @@ func (c *APIClient) GetUserList() (UserList *[]api.UserInfo, err error) {
 	userList, err := c.ParseUserListResponse(userListResponse)
 	if err != nil {
 		res, _ := json.Marshal(userListResponse)
-		return nil, fmt.Errorf("parse user list failed: %s", string(res))
+		return nil, fmt.Errorf("parse user list failed: %s", api.RedactText(string(res)))
 	}
 	return userList, nil
 }

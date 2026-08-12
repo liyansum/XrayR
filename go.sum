@@ -1269,6 +1269,8 @@ github.com/liquidweb/liquidweb-cli v0.7.0 h1:7j1r1U0MZa1TXiWo3IMU5V1YQwnBHMVxU+x
 github.com/liquidweb/liquidweb-cli v0.7.0/go.mod h1:+uU7L6BhaQtgo4cYKhhsP5UNCq/imNvjBjlf76Vqpb0=
 github.com/liquidweb/liquidweb-go v1.6.4 h1:6S0m3hHSpiLqGD7AFSb7lH/W/qr1wx+tKil9fgIbjMc=
 github.com/liquidweb/liquidweb-go v1.6.4/go.mod h1:B934JPIIcdA+uTq2Nz5PgOtG6CuCaEvQKe/Ge/5GgZ4=
+github.com/liyansum/Xray-core v1.8.25-0.20250101120305-e80ca67feed9 h1:0LU0TAshJgKIfngcMayZaqxem4hL2KeglHNNdvrxfd0=
+github.com/liyansum/Xray-core v1.8.25-0.20250101120305-e80ca67feed9/go.mod h1:ZQNlyI+v398/dKXjacCwhGfQlhjPThvmPToC/RBy7oM=
 github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0/go.mod h1:zJYVVT2jmtg6P3p1VtQj7WsuWi/y4VnjVBn7F8KPB3I=
 github.com/lufia/plan9stats v0.0.0-20240226150601-1dcf7310316a h1:3Bm7EwfUQUvhNeKIkUct/gl9eod1TcXuj8stxvi/GoI=
 github.com/lufia/plan9stats v0.0.0-20240226150601-1dcf7310316a/go.mod h1:ilwx/Dta8jXAgpFYFvSWEMwxmbWXyiUHkd5FwyKhb5k=
