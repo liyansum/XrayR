@@ -84,7 +84,7 @@ require (
 
 replace github.com/exoscale/egoscale => github.com/exoscale/egoscale v0.102.3
 
-replace github.com/xtls/xray-core => github.com/liyansum/Xray-core v1.260327.1-0.20260814071547-bd997fc96336
+replace github.com/xtls/xray-core => github.com/liyansum/Xray-core v1.260327.1-0.20260814151158-f5b4e833af34
 
 godebug (
 	tlsmlkem=1
