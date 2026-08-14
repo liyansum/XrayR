@@ -37,9 +37,10 @@ type InboundInfo struct {
 	GlobalLimit    struct {
 		config         *GlobalDeviceLimitConfig
 		globalOnlineIP *marshaler.Marshaler
+		redisClient    *redis.Client
 	}
 	aliveList     atomic.Pointer[map[int]int] // Key: Uid, value: alive_ip
-	OldUserOnline *sync.Map                   // Key: Ip, value: Uid
+	OldUserOnline *sync.Map                   // Key: IP, value: UID from the previous reporting period
 }
 
 type Limiter struct {
@@ -101,6 +102,48 @@ func (i *InboundInfo) updateUsers(tag string, users []api.UserInfo) {
 	}
 }
 
+func (i *InboundInfo) removeUsers(emails []string) {
+	removed := make(map[string]struct{}, len(emails))
+	removedUIDs := make(map[int]struct{}, len(emails))
+	for _, email := range emails {
+		removed[email] = struct{}{}
+	}
+	for {
+		current := i.userInfo.Load()
+		if current == nil {
+			break
+		}
+		next := make(map[string]UserInfo, len(*current))
+		for email, info := range *current {
+			if _, found := removed[email]; found {
+				removedUIDs[info.UID] = struct{}{}
+				continue
+			}
+			next[email] = info
+		}
+		if i.userInfo.CompareAndSwap(current, &next) {
+			break
+		}
+	}
+	for email := range removed {
+		i.BucketHub.Delete(email)
+		i.UserOnlineIP.Delete(email)
+	}
+	i.OldUserOnline.Range(func(key, value any) bool {
+		if _, found := removedUIDs[value.(int)]; found {
+			i.OldUserOnline.Delete(key)
+		}
+		return true
+	})
+}
+
+func (i *InboundInfo) close() error {
+	if i.GlobalLimit.redisClient != nil {
+		return i.GlobalLimit.redisClient.Close()
+	}
+	return nil
+}
+
 func (l *Limiter) AddInboundLimiter(tag string, nodeSpeedLimit uint64, userList *[]api.UserInfo, globalLimit *GlobalDeviceLimitConfig) error {
 	inboundInfo := &InboundInfo{
 		Tag:            tag,
@@ -117,14 +160,16 @@ func (l *Limiter) AddInboundLimiter(tag string, nodeSpeedLimit uint64, userList 
 		gs := goCacheStore.NewGoCache(goCache.New(time.Duration(globalLimit.Expiry)*time.Second, 1*time.Minute))
 
 		// init redis store
-		rs := redisStore.NewRedis(redis.NewClient(
+		redisClient := redis.NewClient(
 			&redis.Options{
 				Network:  globalLimit.RedisNetwork,
 				Addr:     globalLimit.RedisAddr,
 				Username: globalLimit.RedisUsername,
 				Password: globalLimit.RedisPassword,
 				DB:       globalLimit.RedisDB,
-			}),
+			})
+		inboundInfo.GlobalLimit.redisClient = redisClient
+		rs := redisStore.NewRedis(redisClient,
 			store.WithExpiration(time.Duration(globalLimit.Expiry)*time.Second))
 
 		// init chained cache. First use local go-cache, if go-cache is nil, then use redis cache
@@ -136,7 +181,11 @@ func (l *Limiter) AddInboundLimiter(tag string, nodeSpeedLimit uint64, userList 
 	}
 
 	inboundInfo.userInfo.Store(buildUserInfoMap(tag, *userList))
-	l.InboundInfo.Store(tag, inboundInfo) // Replace the old inbound info
+	if old, loaded := l.InboundInfo.Swap(tag, inboundInfo); loaded {
+		if err := old.(*InboundInfo).close(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -166,8 +215,18 @@ func (l *Limiter) UpdateInboundLimiter(tag string, updatedUserList *[]api.UserIn
 }
 
 func (l *Limiter) DeleteInboundLimiter(tag string) error {
-	l.InboundInfo.Delete(tag)
+	if value, loaded := l.InboundInfo.LoadAndDelete(tag); loaded {
+		return value.(*InboundInfo).close()
+	}
 	return nil
+}
+
+func (l *Limiter) RemoveInboundUsers(tag string, emails []string) error {
+	if value, ok := l.InboundInfo.Load(tag); ok {
+		value.(*InboundInfo).removeUsers(emails)
+		return nil
+	}
+	return fmt.Errorf("no such inbound in limiter: %s", tag)
 }
 
 func (l *Limiter) GetOnlineDevice(tag string) (*[]api.OnlineUser, error) {
@@ -175,6 +234,9 @@ func (l *Limiter) GetOnlineDevice(tag string) (*[]api.OnlineUser, error) {
 
 	if value, ok := l.InboundInfo.Load(tag); ok {
 		inboundInfo := value.(*InboundInfo)
+		// OldUserOnline is only needed to bridge one reporting period. Replace
+		// the previous generation before publishing the current online set.
+		inboundInfo.OldUserOnline.Clear()
 		// Clear Speed Limiter bucket for users who are not online
 		inboundInfo.BucketHub.Range(func(key, value interface{}) bool {
 			email := key.(string)

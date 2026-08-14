@@ -101,6 +101,21 @@ func (c *Controller) removeUsers(users []string, tag string) error {
 		if err != nil {
 			return err
 		}
+		if err := c.unregisterUserCounters(email); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Controller) unregisterUserCounters(email string) error {
+	for _, name := range []string{
+		"user>>>" + email + ">>>traffic>>>uplink",
+		"user>>>" + email + ">>>traffic>>>downlink",
+	} {
+		if err := c.stm.UnregisterCounter(name); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -145,6 +160,10 @@ func (c *Controller) AddInboundLimiter(tag string, nodeSpeedLimit uint64, userLi
 func (c *Controller) UpdateInboundLimiter(tag string, updatedUserList *[]api.UserInfo) error {
 	err := c.dispatcher.Limiter.UpdateInboundLimiter(tag, updatedUserList)
 	return err
+}
+
+func (c *Controller) RemoveInboundLimiterUsers(tag string, emails []string) error {
+	return c.dispatcher.Limiter.RemoveInboundUsers(tag, emails)
 }
 
 func (c *Controller) DeleteInboundLimiter(tag string) error {

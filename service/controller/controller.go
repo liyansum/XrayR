@@ -170,15 +170,23 @@ func (c *Controller) Start() error {
 
 // Close implement the Close() function of the service interface
 func (c *Controller) Close() error {
+	var closeErr error
 	for i := range c.tasks {
 		if c.tasks[i].Periodic != nil {
 			if err := c.tasks[i].Periodic.Close(); err != nil {
-				c.logger.Panicf("%s periodic task close failed: %s", c.tasks[i].tag, err)
+				closeErr = errors.Join(closeErr, fmt.Errorf("%s periodic task close failed: %w", c.tasks[i].tag, err))
 			}
 		}
 	}
-
-	return nil
+	if c.Tag != "" {
+		closeErr = errors.Join(closeErr, c.DeleteInboundLimiter(c.Tag))
+	}
+	if c.userList != nil {
+		for _, user := range *c.userList {
+			closeErr = errors.Join(closeErr, c.unregisterUserCounters(c.buildUserTag(&user)))
+		}
+	}
+	return closeErr
 }
 
 func (c *Controller) nodeInfoMonitor() (err error) {
@@ -233,6 +241,14 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 			if err != nil {
 				c.logger.Print(err)
 				return nil
+			}
+			if c.userList != nil {
+				for _, user := range *c.userList {
+					oldEmail := fmt.Sprintf("%s|%s|%d", oldTag, user.Email, user.UID)
+					if err := c.unregisterUserCounters(oldEmail); err != nil {
+						c.logger.Print(err)
+					}
+				}
 			}
 			// Add new tag
 			c.nodeInfo = newNodeInfo
@@ -290,6 +306,8 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 				}
 				err := c.removeUsers(deletedEmail, c.Tag)
 				if err != nil {
+					c.logger.Print(err)
+				} else if err := c.RemoveInboundLimiterUsers(c.Tag, deletedEmail); err != nil {
 					c.logger.Print(err)
 				}
 			}

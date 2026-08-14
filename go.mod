@@ -2,6 +2,8 @@ module github.com/wyx2685/XrayR
 
 go 1.26
 
+toolchain go1.26.6
+
 require (
 	dario.cat/mergo v1.0.2
 	github.com/bitly/go-simplejson v0.5.1
@@ -82,7 +84,7 @@ require (
 
 replace github.com/exoscale/egoscale => github.com/exoscale/egoscale v0.102.3
 
-replace github.com/xtls/xray-core => github.com/liyansum/Xray-core v1.260327.1-0.20260814044358-688558f7ab89
+replace github.com/xtls/xray-core => github.com/liyansum/Xray-core v1.260327.1-0.20260814071547-bd997fc96336
 
 godebug (
 	tlsmlkem=1
